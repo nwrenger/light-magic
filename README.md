@@ -4,7 +4,7 @@
 [![crates.io](https://img.shields.io/crates/d/light-magic.svg)](https://crates.io/crates/light-magic)
 [![docs.rs](https://docs.rs/light-magic/badge.svg)](https://docs.rs/light-magic)
 
-A light weight and easy-to-use implementation of an `in-memory database`.
+A lightweight and easy-to-use implementation of an `in-memory database`.
 
 ## Features
 
