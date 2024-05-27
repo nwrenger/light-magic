@@ -39,7 +39,7 @@ enum Level {
     Admin,
 }
 
-fn test() {
+fn main() {
     let mut db = Database::new();
     db.insert_user(User {
         id: 0,
