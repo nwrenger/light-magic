@@ -2,6 +2,18 @@
 name = "light-magic"
 version = "0.1.0"
 edition = "2021"
+authors = ["Nils Wrenger <nils@wrenger.net>"]
+description = "A lightweight and easy-to-use implementation of an in-memory database"
+keywords = ["database", "framework", "macro"]
+categories = [
+    "database-implementations",
+    "database-interfaces",
+    "data-structures",
+]
+rust-version = "1.60.0"
+repository = "https://github.com/nwrenger/light-magic"
+readme = "README.md"
+license = "MIT"
 
 [lib]
 proc-macro = true
