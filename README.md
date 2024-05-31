@@ -34,13 +34,13 @@ db! {
     criminal => { user_name: String, entry: String }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Level {
     Admin,
 }
 
 fn main() {
-    let mut db = Database::new();
+    let db = Database::new();
     db.insert_user(User {
         id: 0,
         name: "Nils".to_owned(),
@@ -69,6 +69,7 @@ fn main() {
 
 - [ ] Saving data to storage so make the data persistent
 - [ ] Add `join` or some kind of joining data together
+- [x] Add parallelizing
 - [x] Add Search
 - [x] Add Getting, Inserting, Deleting
 - [x] `db!` macro for structure of the Database

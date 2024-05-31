@@ -6,14 +6,14 @@ db! {
     criminal => { user_name: String, entry: String }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Level {
     Admin,
 }
 
 #[test]
 fn test() {
-    let mut db = Database::new();
+    let db = Database::new();
     db.insert_user(User {
         id: 0,
         name: "Nils".to_owned(),

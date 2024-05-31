@@ -59,7 +59,7 @@ fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         let struct_ident = capitalize_ident(&name);
         let matches = generate_matches(&fields);
         structs.extend(quote! {
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             struct #struct_ident { #fields }
 
             impl #struct_ident {
@@ -70,30 +70,43 @@ fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         let key_name = &fields[0].name;
         db_tables.extend(quote! {
             /// The Table, never access this directly and use the functions on the `Database`
-            #name: BTreeMap<#key, #struct_ident>,
+            #name: Arc<Mutex<BTreeMap<#key, #struct_ident>>>,
         });
         let insert_name = pre_extend_ident(&name, "insert_");
         let get_name = pre_extend_ident(&name, "get_");
         let delete_name = pre_extend_ident(&name, "delete_");
         let search_name = pre_extend_ident(&name, "search_");
         db_functions.extend(quote! {
-            fn #insert_name(&mut self, value: #struct_ident) {
-                self.#name.insert(value.#key_name.clone(), value);
+            fn #insert_name(&self, value: #struct_ident) {
+                if let Ok(mut table) = self.#name.lock() {
+                    table.insert(value.#key_name.clone(), value);
+                }
             }
-            fn #get_name(&self, #key_name: &#key) -> Option<&#struct_ident> {
-                self.#name.get(#key_name)
+            fn #get_name(&self, #key_name: &#key) -> Option<#struct_ident> {
+                if let Ok(table) = self.#name.lock() {
+                    table.get(#key_name).cloned()
+                } else {
+                    None
+                }
             }
-            fn #delete_name(&mut self, #key_name: &#key) {
-                self.#name.remove(#key_name);
+            fn #delete_name(&self, #key_name: &#key) {
+                if let Ok(mut table) = self.#name.lock() {
+                    table.remove(#key_name);
+                }
             }
-            fn #search_name(&self, search: &str) -> Vec<&#struct_ident> {
-                self.#name.iter().map(|(_, val)| val).filter(|val| val.matches(search)).collect()
+            fn #search_name(&self, search: &str) -> Vec<#struct_ident> {
+                if let Ok(table) = self.#name.lock() {
+                    table.iter().map(|(_, val)| val.clone()).filter(|val| val.matches(search)).collect()
+                } else {
+                    vec![]
+                }
             }
         })
     }
 
     Ok(quote! {
         use std::collections::BTreeMap;
+        use std::sync::{Arc, Mutex};
 
         #[derive(Default)]
         /// The Database Struct
