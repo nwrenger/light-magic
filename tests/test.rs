@@ -19,20 +19,20 @@ fn test() {
         name: "Nils",
         kind: "Young",
     });
-    println!("{:?}", db.get_user(&0));
-    println!("{:?}", db.search_user("0"));
+    assert!(db.get_user(&0).is_some());
+    assert!(db.search_user("0").len() == 1);
 
     db.insert_permission(Permission {
         user_name: "Nils",
         level: Level::Admin,
     });
-    println!("{:?}", db.get_permission(&"Nils"));
-    println!("{:?}", db.search_permission("Admin"));
+    assert!(db.get_permission(&"Nils").is_some());
+    assert!(db.search_permission("Admin").len() == 1);
 
     db.insert_criminal(Criminal {
         user_name: "Nils",
         entry: "No records until this day! Keep ur eyes pealed!",
     });
-    println!("{:?}", db.get_criminal(&"Nils"));
-    println!("{:?}", db.search_criminal("No records"));
+    assert!(db.get_criminal(&"Nils").is_some());
+    assert!(db.search_criminal("No records").len() == 1);
 }
