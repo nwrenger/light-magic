@@ -29,9 +29,9 @@ light_magic = "0.1.0"
 use light_magic::db;
 
 db! {
-    user => { id: usize, name: &'static str , kind: &'static str },
-    permission => { user_name: &'static str , level: Level },
-    criminal => { user_name: &'static str , entry: &'static str  }
+    user => { id: usize, name: &'static str, kind: &'static str },
+    permission => { user_name: &'static str, level: Level },
+    criminal => { user_name: &'static str, entry: &'static str  }
 }
 
 #[derive(Debug, Clone)]

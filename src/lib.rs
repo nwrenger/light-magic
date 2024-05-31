@@ -77,11 +77,13 @@ fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         let delete_name = pre_extend_ident(&name, "delete_");
         let search_name = pre_extend_ident(&name, "search_");
         db_functions.extend(quote! {
+            /// Insert data, works in parallel
             fn #insert_name(&self, value: #struct_ident) {
                 if let Ok(mut table) = self.#name.lock() {
                     table.insert(value.#key_name.clone(), value);
                 }
             }
+            /// Get data, works in parallel
             fn #get_name(&self, #key_name: &#key) -> Option<#struct_ident> {
                 if let Ok(table) = self.#name.lock() {
                     table.get(#key_name).cloned()
@@ -89,11 +91,13 @@ fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
                     None
                 }
             }
+            /// Delete data, works in parallel
             fn #delete_name(&self, #key_name: &#key) {
                 if let Ok(mut table) = self.#name.lock() {
                     table.remove(#key_name);
                 }
             }
+            /// Search the data, works in parallel
             fn #search_name(&self, search: &str) -> Vec<#struct_ident> {
                 if let Ok(table) = self.#name.lock() {
                     table.iter().map(|(_, val)| val.clone()).filter(|val| val.matches(search)).collect()
