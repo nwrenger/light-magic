@@ -1,4 +1,4 @@
-use light_magic::db;
+use light_magic::{db, join};
 
 db! {
     user => { id: usize, name: &'static str, kind: &'static str },
@@ -12,7 +12,7 @@ enum Level {
 }
 
 #[test]
-fn test() {
+fn normal_ops() {
     let db = Database::new();
     db.insert_user(User {
         id: 0,
@@ -35,4 +35,21 @@ fn test() {
     });
     assert!(db.get_criminal(&"Nils").is_some());
     assert!(db.search_criminal("No records").len() == 1);
+}
+
+#[test]
+fn joins() {
+    let db = Database::new();
+
+    // insert smth
+    db.insert_user(User {
+        id: 0,
+        name: "Nils",
+        kind: "Young",
+    });
+
+    let joined = join!(db, "Nils", user => name, permission => user_name, criminal => user_name);
+    assert!(joined.0.is_some() && joined.0.unwrap_or_default().len() == 1);
+    assert!(joined.1.is_none());
+    assert!(joined.2.is_none());
 }
