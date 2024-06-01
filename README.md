@@ -26,7 +26,7 @@ light_magic = "0.2.0"
 
 ## Example
 
-```rs
+```rust
 use light_magic::db;
 
 db! {
