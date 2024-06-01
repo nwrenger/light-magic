@@ -10,7 +10,7 @@ A lightweight and easy-to-use implementation of an `in-memory database`.
 
 - This crate utilizes the `BTreeMap` from `std::collections` for storing and accessing it's data.
 - Easy markup of tables using the `db!` macro
-- Useful data accessing functions like `search` or `join!` to search the data or join data together
+- Useful data accessing functions like `search` or `join!` macro to search the data or join data together
 - Supports accessing the database in parallel using `Arc<Mutex<_>>` for each table
 
 ...and more. Look into [Todos](#todos) for more planned features!
