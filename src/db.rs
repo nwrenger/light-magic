@@ -134,8 +134,8 @@ fn generate_matches(fields: &Punctuated<Field, Token![,]>) -> proc_macro2::Token
     let matches = fields.iter().map(|field| {
         let field_name = &field.name;
         quote! {
-            let val = format!("{:?}", self.#field_name);
-            if val.contains(query) {
+            let val = format!("{:?}", self.#field_name).to_lowercase();
+            if val.contains(&query.to_lowercase()) {
                 return true;
             }
         }
