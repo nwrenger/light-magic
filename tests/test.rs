@@ -40,10 +40,13 @@ fn normal_ops() {
     assert!(db.search_criminal("No records").len() == 1);
 
     // editing
-    db.edit_criminal(&"Nils", Criminal {
-        user_name: "Nils W.",
-        entry: "Stole a hot dog!",
-    });
+    db.edit_criminal(
+        &"Nils",
+        Criminal {
+            user_name: "Nils W.",
+            entry: "Stole a hot dog!",
+        },
+    );
 
     assert!(db.get_criminal(&"Nils").is_none());
     assert!(db.get_criminal(&"Nils W.").is_some());
