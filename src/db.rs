@@ -79,7 +79,7 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         use std::collections::BTreeMap;
         use std::sync::{Arc, Mutex};
 
-        #[derive(Default)]
+        #[derive(Default, Clone, Debug)]
         /// The Database Struct
         pub struct Database {
             #db_tables
