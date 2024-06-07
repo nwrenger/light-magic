@@ -19,14 +19,23 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
     let mut db_functions = TokenStream::new();
     let mut structs = TokenStream::new();
 
-    for Table { name, fields } in tables {
+    for Table {
+        name,
+        derives,
+        fields,
+    } in tables
+    {
         if fields.is_empty() {
             return Err(s_err(name.span(), "the fields of a table cannot be empty"));
         }
         let struct_ident = capitalize_ident(&name);
         let matches = generate_matches(&fields);
+        let derives = match derives {
+            Some(derives) => quote! {#[derive(Default, Debug, Clone, #derives)]},
+            None => quote! {#[derive(Default, Debug, Clone)]},
+        };
         structs.extend(quote! {
-            #[derive(Default, Debug, Clone)]
+            #derives
             pub struct #struct_ident { #fields }
 
             impl #struct_ident {
@@ -41,16 +50,24 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         });
         let insert_name = pre_extend_ident(&name, "insert_");
         let get_name = pre_extend_ident(&name, "get_");
+        let edit_name = pre_extend_ident(&name, "edit_");
         let delete_name = pre_extend_ident(&name, "delete_");
         let search_name = pre_extend_ident(&name, "search_");
         db_functions.extend(quote! {
-            /// Insert data, works in parallel
-            pub fn #insert_name(&self, value: #struct_ident) {
+            /// Insert data, works in parallel, returns the `value` or `None` if the addition failed
+            pub fn #insert_name(&self, value: #struct_ident) -> Option<#struct_ident> {
                 if let Ok(mut table) = self.#name.lock() {
-                    table.insert(value.#key_name.clone(), value);
+                    if table.get(&value.#key_name.clone()).is_none() {
+                        table.insert(value.#key_name.clone(), value.clone());
+                        Some(value)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
                 }
             }
-            /// Get data, works in parallel
+            /// Get data, works in parallel, returns the `value` or `None` if it couldn't find the data
             pub fn #get_name(&self, #key_name: &#key) -> Option<#struct_ident> {
                 if let Ok(table) = self.#name.lock() {
                     table.get(#key_name).cloned()
@@ -58,10 +75,25 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
                     None
                 }
             }
-            /// Delete data, works in parallel
-            pub fn #delete_name(&self, #key_name: &#key) {
+            /// Edit data, works in parallel, returns the `new_value` or `None` if the editing failed
+            pub fn #edit_name(&self, #key_name: &#key, new_value: #struct_ident) -> Option<#struct_ident> {
                 if let Ok(mut table) = self.#name.lock() {
-                    table.remove(#key_name);
+                    if table.remove(#key_name).is_some() {
+                        table.insert(new_value.#key_name, new_value.clone());
+                        Some(new_value)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            /// Delete data, works in parallel, returns the `value` or `None` if the deletion failed
+            pub fn #delete_name(&self, #key_name: &#key) -> Option<#struct_ident> {
+                if let Ok(mut table) = self.#name.lock() {
+                    table.remove(#key_name)
+                } else {
+                    None
                 }
             }
             /// Search the data, works in parallel
@@ -123,6 +155,7 @@ struct Args {
 
 struct Table {
     name: Ident,
+    derives: Option<Punctuated<Ident, Token![,]>>,
     fields: Punctuated<Field, Token![,]>,
 }
 
@@ -156,6 +189,16 @@ impl Parse for Args {
 
         while !input.is_empty() {
             let ident = syn::Ident::parse(input)?;
+
+            let derives = if input.peek(Token![:]) {
+                <Token![:]>::parse(input)?;
+                let derive_content;
+                syn::bracketed!(derive_content in input);
+                Some(derive_content.parse_terminated(Ident::parse, Token![,])?)
+            } else {
+                None
+            };
+
             <syn::Token![=>]>::parse(input)?;
 
             let content;
@@ -163,6 +206,7 @@ impl Parse for Args {
             let parsed_fields = content.parse_terminated(Field::parse, Token![,])?;
             tables.push(Table {
                 name: ident,
+                derives,
                 fields: parsed_fields,
             });
 
