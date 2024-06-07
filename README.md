@@ -76,4 +76,4 @@ fn main() {
 
 ## Todos
 
-- Add somehow a persistence feature -> using `Drop` or after each time changing, saving async to storage
+- Add somehow a persistence feature -> using `Drop` or after each time changing, then saving async to storage
