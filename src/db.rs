@@ -27,7 +27,7 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         let matches = generate_matches(&fields);
         structs.extend(quote! {
             #[derive(Debug, Clone)]
-            struct #struct_ident { #fields }
+            pub struct #struct_ident { #fields }
 
             impl #struct_ident {
                 #matches
@@ -146,7 +146,7 @@ impl ToTokens for Field {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = &self.name;
         let ty = &self.ty;
-        tokens.extend(quote! { #name: #ty })
+        tokens.extend(quote! { pub #name: #ty })
     }
 }
 
