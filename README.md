@@ -76,4 +76,4 @@ fn main() {
 
 ## Todos
 
-> All current todos are done
+- Add somehow a persistence feature -> using `Drop` or after each time changing, saving async to storage
