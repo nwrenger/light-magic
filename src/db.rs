@@ -79,7 +79,7 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
             pub fn #edit_name(&self, #key_name: &#key, new_value: #struct_ident) -> Option<#struct_ident> {
                 if let Ok(mut table) = self.#name.lock() {
                     if table.remove(#key_name).is_some() {
-                        table.insert(new_value.#key_name, new_value.clone());
+                        table.insert(new_value.#key_name.clone(), new_value.clone());
                         Some(new_value)
                     } else {
                         None

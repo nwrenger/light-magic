@@ -51,6 +51,7 @@ fn pre_extend_ident(ident: &Ident, pre_extend: &str) -> Ident {
 /// ## Functions
 /// - `insert_#table`
 /// - `get_#table`
+/// - `edit_#table`
 /// - `delete_#table`
 /// - `search_#table`
 ///
@@ -63,7 +64,9 @@ fn pre_extend_ident(ident: &Ident, pre_extend: &str) -> Ident {
 ///     // `{...}` is the table data
 ///     // the first field, like here `name`, is the `primary_key`
 ///     user => { id: usize, name: String, kind: String },
-///     criminal => { user_name: String, entry: String }
+///     // using [...] after the table name you can add your own derives
+///     // like here `PartialEq`
+///     criminal: [PartialEq] => { user_name: String, entry: String }
 /// }
 /// ```
 #[proc_macro]

@@ -29,7 +29,7 @@ light_magic = "0.3.0"
 Using it in an Axum Server? Look here: [maud-magic-rs](https://github.com/nwrenger/maud-magic-rs). Otherwise, look at this general example:
 
 ```rust
-use light_magic::db;
+use light_magic::{db, join};
 
 db! {
     user => { id: usize, name: &'static str, kind: &'static str },
@@ -37,8 +37,9 @@ db! {
     criminal => { user_name: &'static str, entry: &'static str  }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 enum Level {
+    #[default]
     Admin,
 }
 
