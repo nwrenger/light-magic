@@ -21,10 +21,12 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-light_magic = "0.2.0"
+light_magic = "0.3.0"
 ```
 
-## Example
+## Examples
+
+Using it in an Axum Server? Look here: [maud-magic-rs](https://github.com/nwrenger/maud-magic-rs). Otherwise, look at this general example:
 
 ```rust
 use light_magic::db;

@@ -1,6 +1,6 @@
 [package]
 name = "light-magic"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Nils Wrenger <nils@wrenger.net>"]
 description = "A lightweight and easy-to-use implementation of an in-memory database"
