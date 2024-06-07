@@ -26,7 +26,7 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         let struct_ident = capitalize_ident(&name);
         let matches = generate_matches(&fields);
         structs.extend(quote! {
-            #[derive(Debug, Clone)]
+            #[derive(Default, Debug, Clone)]
             pub struct #struct_ident { #fields }
 
             impl #struct_ident {
@@ -79,7 +79,7 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
         use std::collections::BTreeMap;
         use std::sync::{Arc, Mutex};
 
-        #[derive(Default, Clone, Debug)]
+        #[derive(Default, Debug, Clone)]
         /// The Database Struct
         pub struct Database {
             #db_tables

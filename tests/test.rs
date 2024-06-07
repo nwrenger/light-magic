@@ -6,8 +6,9 @@ db! {
     criminal => { user_name: &'static str, entry: &'static str  }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 enum Level {
+    #[default]
     Admin,
 }
 
