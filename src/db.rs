@@ -59,13 +59,10 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
                 if let Ok(mut table) = self.#name.lock() {
                     if table.get(&value.#key_name.clone()).is_none() {
                         table.insert(value.#key_name.clone(), value.clone());
-                        Some(value)
-                    } else {
-                        None
+                        return Some(value);
                     }
-                } else {
-                    None
                 }
+                None
             }
             /// Get data, works in parallel, returns the `value` or `None` if it couldn't find the data
             pub fn #get_name(&self, #key_name: &#key) -> Option<#struct_ident> {
@@ -78,15 +75,14 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
             /// Edit data, works in parallel, returns the `new_value` or `None` if the editing failed
             pub fn #edit_name(&self, #key_name: &#key, new_value: #struct_ident) -> Option<#struct_ident> {
                 if let Ok(mut table) = self.#name.lock() {
-                    if table.get(&new_value.#key_name.clone()).is_none() && table.remove(#key_name).is_some() {
-                        table.insert(new_value.#key_name.clone(), new_value.clone());
-                        Some(new_value)
-                    } else {
-                        None
+                    if &new_value.#key_name == #key_name || table.get(&new_value.#key_name).is_none() {
+                        if table.remove(#key_name).is_some() {
+                            table.insert(new_value.#key_name.clone(), new_value.clone());
+                            return Some(new_value);
+                        }
                     }
-                } else {
-                    None
                 }
+                None
             }
             /// Delete data, works in parallel, returns the `value` or `None` if the deletion failed
             pub fn #delete_name(&self, #key_name: &#key) -> Option<#struct_ident> {
