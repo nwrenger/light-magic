@@ -49,7 +49,7 @@ fn pre_extend_ident(ident: &Ident, pre_extend: &str) -> Ident {
 /// Creates the Database struct with the fitting logic
 ///
 /// ## Functions
-/// - `insert_#table`
+/// - `add_#table`
 /// - `get_#table`
 /// - `edit_#table`
 /// - `delete_#table`
