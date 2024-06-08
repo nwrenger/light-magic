@@ -48,14 +48,14 @@ pub(crate) fn db_inner(input: TokenStream) -> syn::Result<TokenStream> {
             /// The Table, never access this directly and use the functions on the `Database`
             #name: Arc<Mutex<BTreeMap<#key, #struct_ident>>>,
         });
-        let insert_name = pre_extend_ident(&name, "insert_");
+        let add_name = pre_extend_ident(&name, "add_");
         let get_name = pre_extend_ident(&name, "get_");
         let edit_name = pre_extend_ident(&name, "edit_");
         let delete_name = pre_extend_ident(&name, "delete_");
         let search_name = pre_extend_ident(&name, "search_");
         db_functions.extend(quote! {
-            /// Insert data, works in parallel, returns the `value` or `None` if the addition failed
-            pub fn #insert_name(&self, value: #struct_ident) -> Option<#struct_ident> {
+            /// Add data, works in parallel, returns the `value` or `None` if the addition failed
+            pub fn #add_name(&self, value: #struct_ident) -> Option<#struct_ident> {
                 if let Ok(mut table) = self.#name.lock() {
                     if table.get(&value.#key_name.clone()).is_none() {
                         table.insert(value.#key_name.clone(), value.clone());

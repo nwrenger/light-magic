@@ -16,8 +16,8 @@ enum Level {
 fn normal_ops() {
     let db = Database::new();
 
-    // normal inserting
-    db.insert_user(User {
+    // normal adding
+    db.add_user(User {
         id: 0,
         name: "Nils",
         kind: "Young",
@@ -25,14 +25,14 @@ fn normal_ops() {
     assert!(db.get_user(&0).is_some());
     assert!(db.search_user("0").len() == 1);
 
-    db.insert_permission(Permission {
+    db.add_permission(Permission {
         user_name: "Nils",
         level: Level::Admin,
     });
     assert!(db.get_permission(&"Nils").is_some());
     assert!(db.search_permission("Admin").len() == 1);
 
-    db.insert_criminal(Criminal {
+    db.add_criminal(Criminal {
         user_name: "Nils",
         entry: "No records until this day! Keep ur eyes pealed!",
     });
@@ -73,8 +73,8 @@ fn custom_derives() {
         kind: "Old",
     };
 
-    let inserted_user1 = db.insert_user(user1.clone()).unwrap();
-    let inserted_user2 = db.insert_user(user2.clone()).unwrap();
+    let inserted_user1 = db.add_user(user1.clone()).unwrap();
+    let inserted_user2 = db.add_user(user2.clone()).unwrap();
 
     // Ensure the inserted users are not the same (since their IDs should differ)
     assert_ne!(inserted_user1, inserted_user2);
@@ -88,8 +88,8 @@ fn custom_derives() {
 fn joins() {
     let db = Database::new();
 
-    // insert smth
-    db.insert_user(User {
+    // add smth
+    db.add_user(User {
         id: 0,
         name: "Nils",
         kind: "Young",
