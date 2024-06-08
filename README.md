@@ -21,7 +21,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-light_magic = "0.3.2"
+light_magic = "0.3.3"
 ```
 
 ## Examples
@@ -45,7 +45,7 @@ enum Level {
 
 fn main() {
     let db = Database::new();
-    db.insert_user(User {
+    db.add_user(User {
         id: 0,
         name: "Nils",
         kind: "Young",
@@ -53,14 +53,14 @@ fn main() {
     println!("{:?}", db.get_user(&0));
     println!("{:?}", db.search_user("0"));
 
-    db.insert_permission(Permission {
+    db.add_permission(Permission {
         user_name: "Nils",
         level: Level::Admin,
     });
     println!("{:?}", db.get_permission(&"Nils"));
     println!("{:?}", db.search_permission("Admin"));
 
-    db.insert_criminal(Criminal {
+    db.add_criminal(Criminal {
         user_name: "Nils",
         entry: "No records until this day! Keep ur eyes pealed!",
     });
