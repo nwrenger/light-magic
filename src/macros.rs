@@ -2,7 +2,7 @@
 ///
 /// ## Concurrency
 ///
-/// Lock the AtomicDatabase using read() / write() to access and changes it values.
+/// Lock the `AtomicDatabase` using `read()` / `write()` to access and changes it values.
 /// The saving of changes will be applied after the used variables are dropped.
 ///
 /// ## Functions
