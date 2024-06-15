@@ -35,12 +35,13 @@ macro_rules! db {
         ),* $(,)?
     ) => {
         use std::collections::BTreeMap;
-        use serde::{Serialize, Deserialize};
         use std::path::Path;
+        use serde::{Serialize, Deserialize};
+
 
         $crate::paste::paste! {
             /// The Database Struct
-            #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+            #[derive(Default, Debug, Serialize, Deserialize)]
             pub struct Database {
                 $(
                     #[doc = "The " $table:camel " Table, never access this directly and use the functions on the `Database`"]
@@ -163,7 +164,7 @@ macro_rules! get_first_name {
 /// }
 ///
 /// let db = Database::new(Path::new("./tests/test1.json"));
-/// // Firstly specify the db to be used, then the key,
+/// // Firstly specify the Database which should be used, then the key,
 /// // and lastly the joined items with the field which should be joined
 /// let joined = join!(db.read(), "Nils", user => name, criminal => user_name);
 /// ```
