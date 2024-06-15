@@ -36,7 +36,7 @@ macro_rules! db {
     ) => {
         use std::collections::BTreeMap;
         use std::path::Path;
-        use serde::{Serialize, Deserialize};
+        use $crate::serde::{Serialize, Deserialize};
 
 
         $crate::paste::paste! {
