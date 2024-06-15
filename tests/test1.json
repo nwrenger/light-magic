@@ -1,0 +1,16 @@
+{
+  "user": {
+    "0": {
+      "id": 0,
+      "name": "Nils",
+      "kind": "Young"
+    }
+  },
+  "permission": {
+    "Nils": {
+      "user_name": "Nils",
+      "level": "Admin"
+    }
+  },
+  "criminal": {}
+}

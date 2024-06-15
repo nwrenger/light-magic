@@ -1,12 +1,12 @@
 use light_magic::{db, join};
 
 db! {
-    user: [PartialEq] => { id: usize, name: &'static str, kind: &'static str },
-    permission => { user_name: &'static str, level: Level },
-    criminal => { user_name: &'static str, entry: &'static str  }
+    user: [PartialEq] => { id: usize, name: String, kind: String },
+    permission => { user_name: String, level: Level },
+    criminal => { user_name: String, entry: String  }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 enum Level {
     #[default]
     Admin,
@@ -14,67 +14,67 @@ enum Level {
 
 #[test]
 fn normal_ops() {
-    let db = Database::new();
+    let db = Database::new(Path::new("./tests/test1.json"));
 
     // normal adding
-    db.add_user(User {
+    db.write().add_user(User {
         id: 0,
-        name: "Nils",
-        kind: "Young",
+        name: String::from("Nils"),
+        kind: String::from("Young"),
     });
-    assert!(db.get_user(&0).is_some());
-    assert!(db.search_user("0").len() == 1);
+    assert!(db.read().get_user(&0).is_some());
+    assert!(db.read().search_user("0").len() == 1);
 
-    db.add_permission(Permission {
-        user_name: "Nils",
+    db.write().add_permission(Permission {
+        user_name: String::from("Nils"),
         level: Level::Admin,
     });
-    assert!(db.get_permission(&"Nils").is_some());
-    assert!(db.search_permission("Admin").len() == 1);
+    assert!(db.read().get_permission(&String::from("Nils")).is_some());
+    assert!(db.read().search_permission("Admin").len() == 1);
 
-    db.add_criminal(Criminal {
-        user_name: "Nils",
-        entry: "No records until this day! Keep ur eyes pealed!",
+    db.write().add_criminal(Criminal {
+        user_name: String::from("Nils"),
+        entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
-    assert!(db.get_criminal(&"Nils").is_some());
-    assert!(db.search_criminal("No records").len() == 1);
+    assert!(db.read().get_criminal(&String::from("Nils")).is_some());
+    assert!(db.read().search_criminal("No records").len() == 1);
 
     // editing
-    db.edit_criminal(
-        &"Nils",
+    db.write().edit_criminal(
+        &String::from("Nils"),
         Criminal {
-            user_name: "Nils W.",
-            entry: "Stole a hot dog!",
+            user_name: String::from("Nils W."),
+            entry: String::from("Stole a hot dog!"),
         },
     );
 
-    assert!(db.get_criminal(&"Nils").is_none());
-    assert!(db.get_criminal(&"Nils W.").is_some());
-    assert!(db.search_criminal("hot dog").len() == 1);
+    assert!(db.read().get_criminal(&String::from("Nils")).is_none());
+    assert!(db.read().get_criminal(&String::from("Nils W.")).is_some());
+    assert!(db.read().search_criminal("hot dog").len() == 1);
 
     // deleting
-    db.delete_criminal(&"Nils W.");
+    db.write().delete_criminal(&String::from("Nils W."));
 
-    assert!(db.get_criminal(&"Nils W.").is_none());
+    assert!(db.read().get_criminal(&String::from("Nils W.")).is_none());
 }
 
 #[test]
 fn custom_derives() {
-    let db = Database::new();
+    let db = Database::new(Path::new("./tests/test2.json"));
 
     let user1 = User {
         id: 0,
-        name: "Nils",
-        kind: "Young",
+        name: String::from("Nils"),
+        kind: String::from("Young"),
     };
     let user2 = User {
         id: 1,
-        name: "Alice",
-        kind: "Old",
+        name: String::from("Alice"),
+        kind: String::from("Old"),
     };
 
-    let inserted_user1 = db.add_user(user1.clone()).unwrap();
-    let inserted_user2 = db.add_user(user2.clone()).unwrap();
+    let inserted_user1 = db.write().add_user(user1.clone()).unwrap_or(user1);
+    let inserted_user2 = db.write().add_user(user2.clone()).unwrap_or(user2);
 
     // Ensure the inserted users are not the same (since their IDs should differ)
     assert_ne!(inserted_user1, inserted_user2);
@@ -86,16 +86,17 @@ fn custom_derives() {
 
 #[test]
 fn joins() {
-    let db = Database::new();
+    let db = Database::new(Path::new("./tests/test3.json"));
 
     // add smth
-    db.add_user(User {
+    db.write().add_user(User {
         id: 0,
-        name: "Nils",
-        kind: "Young",
+        name: String::from("Nils"),
+        kind: String::from("Young"),
     });
 
-    let joined = join!(db, "Nils", user => name, permission => user_name, criminal => user_name);
+    let joined =
+        join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
     assert!(joined.0.is_some() && joined.0.unwrap_or_default().len() == 1);
     assert!(joined.1.is_none());
     assert!(joined.2.is_none());

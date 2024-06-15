@@ -1,24 +1,24 @@
 [package]
 name = "light-magic"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2021"
 authors = ["Nils Wrenger <nils@wrenger.net>"]
-description = "A lightweight and easy-to-use implementation of an in-memory database"
+description = "A lightweight and easy-to-use implementation of a persistent in-memory database"
 keywords = ["database", "framework", "macro"]
 categories = [
     "database-implementations",
     "database-interfaces",
     "data-structures",
 ]
-rust-version = "1.60.0"
+rust-version = "1.56.0"
 repository = "https://github.com/nwrenger/light-magic"
 readme = "README.md"
 license = "MIT"
 
 [lib]
-proc-macro = true
 
 [dependencies]
-quote = "1.0"
-syn = { version = "2.0.62" }
-proc-macro2 = "1.0"
+paste = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
