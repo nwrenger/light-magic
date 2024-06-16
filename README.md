@@ -29,7 +29,7 @@ light_magic = "0.5.0"
 
 ## Examples
 
-Using it in an Axum Server? Look here: [maud-magic-rs](https://github.com/nwrenger/maud-magic-rs). Otherwise, look at this general example:
+Using it in an `axum` Server? Look here: [maud-magic-rs](https://github.com/nwrenger/maud-magic-rs). Otherwise, look at this general example:
 
 ```rust
 use light_magic::{db, join};
