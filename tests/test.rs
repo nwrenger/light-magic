@@ -88,6 +88,10 @@ fn custom_derives() {
 fn joins() {
     let db = Database::new(Path::new("./tests/test3.json"));
 
+    // remove any if there
+    db.write().delete_permission(&"Nils".to_string());
+    db.write().delete_criminal(&"Nils".to_string());
+
     // add smth
     db.write().add_user(User {
         id: 0,
@@ -97,7 +101,45 @@ fn joins() {
 
     let joined =
         join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
-    assert!(joined.0.is_some() && joined.0.unwrap_or_default().len() == 1);
-    assert!(joined.1.is_none());
-    assert!(joined.2.is_none());
+    assert!(joined.is_empty());
+
+    // add more
+    db.write().add_permission(Permission {
+        user_name: String::from("Nils"),
+        level: Level::Admin,
+    });
+
+    db.write().add_criminal(Criminal {
+        user_name: String::from("Nils"),
+        entry: String::from("No records until this day! Keep ur eyes pealed!"),
+    });
+
+    let joined =
+        join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
+    assert!(!joined.is_empty());
+
+    // add even more
+    for i in 0..4 {
+        db.write().add_user(User {
+            id: i,
+            name: String::from("Smth".to_string() + &i.to_string()),
+            kind: String::from("Young"),
+        });
+
+        db.write().add_permission(Permission {
+            user_name: String::from("Smth".to_string() + &i.to_string()),
+            level: Level::Admin,
+        });
+
+        db.write().add_criminal(Criminal {
+            user_name: String::from("Smth".to_string() + &i.to_string()),
+            entry: String::from("No records until this day! Keep ur eyes pealed!"),
+        });
+    }
+
+    let joined =
+        join!(db.read(), "Smth2", user => name, permission => user_name, criminal => user_name);
+
+    assert!(joined.len() == 1);
+    assert!(joined[0].0.name == "Smth2");
 }

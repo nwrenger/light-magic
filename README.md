@@ -70,9 +70,7 @@ fn main() {
     println!("{:?}", db.read().search_criminal("No records"));
 
     let joined = join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
-    println!("{:?}", joined.0);
-    println!("{:?}", joined.1);
-    println!("{:?}", joined.2);
+    println!("{:?}", joined);
 }
 ```
 

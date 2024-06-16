@@ -171,17 +171,25 @@ macro_rules! get_first_name {
 #[macro_export]
 macro_rules! join {
     ($db:expr, $key:expr, $($table:ident => $field:ident),* $(,)?) => {{
-        (
+        $crate::paste::paste! {
+            let mut combined_results = Vec::new();
+
             $(
-                {
-                    let filtered = $db.$table.iter().map(|(_, val)| val.clone()).filter(|val| val.$field == $key).collect::<Vec<_>>();
-                    if !filtered.is_empty() {
-                        Some(filtered)
-                    } else {
-                        None
-                    }
-                }
-            ),*
-        )
-    }};
+                let [<$table:snake _results>]: Vec<_> = $db.$table.values()
+                    .filter(|val| val.$field == $key)
+                    .cloned()
+                    .collect();
+            )*
+
+            let len = vec![$([<$table:snake _results>].len()),*].into_iter().min().unwrap_or(0);
+
+            for i in 0..len {
+                combined_results.push((
+                    $([<$table:snake _results>][i].clone(),)*
+                ));
+            }
+
+            combined_results
+        }
+    }}
 }
