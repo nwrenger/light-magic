@@ -5,12 +5,8 @@ edition = "2021"
 authors = ["Nils Wrenger <nils@wrenger.net>"]
 description = "A lightweight, fast and easy-to-use implementation of a persistent in-memory database"
 keywords = ["database", "framework", "macro"]
-categories = [
-    "database-implementations",
-    "database-interfaces",
-    "data-structures",
-]
-rust-version = "1.56.0"
+categories = ["asynchronous", "database-interfaces", "data-structures"]
+rust-version = "1.65.0"
 repository = "https://github.com/nwrenger/light-magic"
 readme = "README.md"
 license = "MIT"
