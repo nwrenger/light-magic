@@ -36,7 +36,7 @@ macro_rules! db {
             pub struct Database {
                 $(
                     #[doc = "The " $table:camel " Table"]
-                    [<$table:snake>]: Table<$crate::get_first_type!($($field_name : $field_ty),*), [<$table:camel>]>,
+                    pub [<$table:snake>]: Table<$crate::get_first_type!($($field_name : $field_ty),*), [<$table:camel>]>,
                 )*
             }
 
