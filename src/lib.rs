@@ -3,5 +3,6 @@
 pub use paste;
 pub use serde;
 
+pub mod atomic;
 pub mod macros;
-pub mod persistence;
+pub mod table;
