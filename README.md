@@ -6,7 +6,6 @@
 
 A lightweight, fast and easy-to-use implementation of a `persistent in-memory database`.
 
-
 ## Features
 
 Please note that this database is highly optimized for read operations. Writing to the database is relatively slow when using `open` because each write operation involves writing data to the disk. These writes are done atomically, ensuring no data loss on a system-wide crash.
