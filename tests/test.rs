@@ -1,9 +1,10 @@
 use light_magic::{db, join};
 
 db! {
-    user: [PartialEq] => { id: usize, name: String, kind: String },
-    permission => { user_name: String, level: Level },
-    criminal => { user_name: String, entry: String  },
+    Table<User: PartialEq> => { id: usize, name: String, kind: String },
+    Table<Permission> => { user_name: String, level: Level },
+    Table<Criminal> => { user_name: String, entry: String  },
+    None<Settings: PartialEq> => { time: usize, password: String }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +39,15 @@ fn normal_ops_in_persistence() {
     });
     assert!(db.read().criminal.get(&String::from("Nils")).is_some());
     assert!(db.read().criminal.search("No records").len() == 1);
+
+    let settings = Settings {
+        time: 1718744090,
+        password: String::from("password"),
+    };
+
+    db.write().settings = settings.clone();
+
+    assert_eq!(db.read().settings, settings);
 
     // editing
     db.write().criminal.edit(

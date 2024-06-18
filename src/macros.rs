@@ -8,25 +8,28 @@
 /// use light_magic::db;
 ///
 /// db! {
-///     // `users` is the table name
+///     // `Table` is the identifier that this will use the builtin table type
+///     // `User` is the table name
 ///     // `{...}` is the table data
 ///     // the first field, like here `id`, is the `primary_key`
-///     user => { id: usize, name: String, kind: String },
-///     // using [...] after the table name you can add your own derives
+///     Table<User> => { id: usize, name: String, kind: String },
+///     // to not use the builtin table type use `None` as the identifier of the table
+///     // using `:` after the table name you can add your own derives
 ///     // like here `PartialEq`
-///     criminal: [PartialEq] => { user_name: String, entry: String }
+///     None<Criminal: PartialEq> => { user_name: String, entry: String }
 /// }
 /// ```
 #[macro_export]
 macro_rules! db {
     (
         $(
-            $table:ident $(: [$($derive:ident),*])? => { $($field_name:ident : $field_ty:ty),* }
+            $table_ty:ident<$table:ty $( : $($derive:ident),* )?> => {
+                $($field_name:ident : $field_ty:ty),*
+            }
         ),* $(,)?
     ) => {
         use std::path::Path;
         use $crate::serde::{Serialize, Deserialize};
-        use $crate::table::{Table, Matches, FirstField};
         use $crate::atomic::{DataStore, AtomicDatabase};
         use $crate::paste::paste;
 
@@ -35,63 +38,73 @@ macro_rules! db {
             #[derive(Default, Debug, Serialize, Deserialize)]
             pub struct Database {
                 $(
-                    #[doc = "The " $table:camel " Table"]
-                    pub [<$table:snake>]: Table<$crate::get_first_type!($($field_name : $field_ty),*), [<$table:camel>]>,
+                        #[doc = "The " $table:camel " Table"]
+                        pub [<$table:snake>]: db!(@expand_table_ty $table_ty, db!(@get_first_type $($field_name : $field_ty),*), [<$table:camel>]),
                 )*
             }
 
             impl<'a> DataStore for Database {}
 
             $(
-                #[derive(Default, Debug, Clone, Serialize, Deserialize $(, $($derive),* )?)]
+                #[derive(Default, Debug, Clone, Serialize, Deserialize, $( $( $derive),*)?)]
                 pub struct [<$table:camel>] {
                     $(
                         pub $field_name: $field_ty,
                     )*
                 }
 
-                impl Matches for [<$table:camel>] {
-                    fn matches(&self, query: &str) -> bool {
-                        $(
-                            if format!("{:?}", self.$field_name).to_lowercase().contains(&query.to_lowercase()) {
-                                return true;
-                            }
-                        )*
-                        false
-                    }
-                }
-
-                impl FirstField for [<$table:camel>] {
-                    type FieldType = $crate::get_first_type!($($field_name : $field_ty),*);
-
-                    fn first_field(&self) -> &Self::FieldType {
-                        &$crate::get_first_name!(self, $($field_name),*)
-                    }
-                }
+                db!(@impls $table_ty, [<$table:camel>], $($field_name : $field_ty),*);
             )*
         }
-    }
-}
-
-/// Helper for getting the first type of a struct
-#[macro_export]
-macro_rules! get_first_type {
-    ($first_name:ident : $first_ty:ty, $($rest_name:ident : $rest_ty:ty),*) => {
-        $first_ty
     };
-    ($first_name:ident : $first_ty:ty) => {
-        $first_ty
-    };
-}
 
-/// Helper for getting the first name of a struct
-#[macro_export]
-macro_rules! get_first_name {
-    ($value:expr, $first_name:ident, $($rest_name:ident),*) => {
+    // Only creating impls if using a specific table type
+    (@impls Table, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {
+        impl $crate::table::Matches for $table_name {
+            fn matches(&self, query: &str) -> bool {
+                $(
+                    if format!("{:?}", self.$field_name).to_lowercase().contains(&query.to_lowercase()) {
+                        return true;
+                    }
+                )*
+                false
+            }
+        }
+
+        impl $crate::table::FirstField for $table_name {
+            type FieldType = db!(@get_first_type $($field_name : $field_ty),*);
+
+            fn first_field(&self) -> &Self::FieldType {
+                &db!(@get_first_name self, $($field_name),*)
+            }
+        }
+    };
+
+    // If you don't want to use the build in type
+    (@impls None, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {};
+
+    // Helper for expanding the table type conditionally
+    (@expand_table_ty Table, $first_type:ty, $table_name:ident) => {
+        $crate::table::Table<$first_type, $table_name>
+    };
+    (@expand_table_ty None, $first_type:ty, $table_name:ident) => {
+        $table_name
+    };
+
+    // Helper for getting the first name of a struct
+    (@get_first_name $value:expr, $first_name:ident, $($rest_name:ident),*) => {
         $value.$first_name
     };
-    ($value:expr, $first_name:ident) => {
+    (@get_first_name $value:expr, $first_name:ident) => {
         $value.$first_name
+    };
+
+    // Helper for getting the first type of a struct
+    (@get_first_type $first_name:ident : $first_ty:ty, $($rest_name:ident : $rest_ty:ty),*) => {
+        $first_ty
+    };
+    (@get_first_type $first_name:ident : $first_ty:ty) => {
+        $first_ty
     };
 }
 
@@ -101,8 +114,8 @@ macro_rules! get_first_name {
 /// use light_magic::{db, join};
 ///
 /// db! {
-///     user => { id: usize, name: String, kind: String },
-///     criminal => { user_name: String, entry: String }
+///     Table<User> => { id: usize, name: String, kind: String },
+///     Table<Criminal> => { user_name: String, entry: String }
 /// }
 ///
 /// let db = Database::open_in_memory();

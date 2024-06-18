@@ -34,10 +34,12 @@ Using it in an `axum` Server? Look here: [maud-magic-rs](https://github.com/nwre
 ```rust
 use light_magic::{db, join};
 
+
 db! {
-    user => { id: usize, name: String, kind: String },
-    permission => { user_name: String, level: Level },
-    criminal => { user_name: String, entry: String  }
+    Table<User> => { id: usize, name: String, kind: String },
+    Table<Permission> => { user_name: String, level: Level },
+    Table<Criminal> => { user_name: String, entry: String  },
+    None<Settings> => { time: usize, password: String }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +72,12 @@ fn main() {
     });
     println!("{:?}", db.read().criminal.get(&String::from("Nils")));
     println!("{:?}", db.read().criminal.search("No records"));
+
+    db.write().settings = Settings {
+        time: 1718744090,
+        password: String::from("password"),
+    };
+    println!("{:?}", db.read().settings);
 
     let joined = join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
     println!("{:?}", joined);
