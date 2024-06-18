@@ -108,7 +108,7 @@ macro_rules! db {
     };
 }
 
-/// Joins Data in the Database together
+/// Joins Data of different `Tables` in the Database together
 ///
 /// ```
 /// use light_magic::{db, join};
