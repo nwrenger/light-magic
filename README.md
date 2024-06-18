@@ -9,15 +9,15 @@ A lightweight, fast and easy-to-use implementation of a `persistent in-memory da
 
 ## Features
 
-> Please note that this database is highly optimized for read operations. Writing to the database is relatively slow because each write operation involves writing data to the disk when using `open`. These writes are done atomically, ensuring no data loss on a system-wide crash.
+Please note that this database is highly optimized for read operations. Writing to the database is relatively slow when using `open` because each write operation involves writing data to the disk. These writes are done atomically, ensuring no data loss on a system-wide crash.
 
-- Data can be saved automatically and persistently to a formatted `json` file via `open`, or operated in-memory via `open_in_memory`.
-- Easy markup of tables using the `db!` macro.
-- Useful data accessing functions like `search` or `join!` macro to search the data or join data together.
-- This crate utilizes the `BTreeMap` from `std::collections` for storing and accessing it's tables.
-- Supports accessing the database in parallel using a `Arc<AtomicDatabase<_>>`.
+- **Persistent Data Storage**: Data can be saved automatically and persistently to a formatted `JSON` file via `open`, or it can be operated in-memory using `open_in_memory`.
+- **Easy Table Markup**: The `db!` macro allows for straightforward table markup.
+- **Powerful Data Access Functions**: Utilize functions like `search` and the `join!` macro for efficient data searching and joining.
+- **Efficient Storage**: The database employs a custom `Table` data type, which uses the `BTreeMap` type from `std::collections` under the hood, for efficient storage and easy access of its tables.
+- **Parallel Access Support**: Access the database in parallel using `Arc<AtomicDatabase<_>>`.
 
-...and more. Look into [Todos](#todos) for more planned features!
+> ...and more. Look into [Todos](#todos) for more planned features!
 
 ## Installation
 
