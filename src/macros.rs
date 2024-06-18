@@ -58,7 +58,7 @@ macro_rules! db {
         }
     };
 
-    // Only creating impls if using a specific table type
+    // Creating impls for specific table types
     (@impls Table, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {
         impl $crate::table::Matches for $table_name {
             fn matches(&self, query: &str) -> bool {
@@ -79,8 +79,6 @@ macro_rules! db {
             }
         }
     };
-
-    // If you don't want to use the build in type
     (@impls None, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {};
 
     // Helper for expanding the table type conditionally
