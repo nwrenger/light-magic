@@ -6,14 +6,15 @@
 
 A lightweight, fast and easy-to-use implementation of a `persistent in-memory database`.
 
+
 ## Features
 
-- Please note that this database is highly optimized for read operations. Writing to the database is relatively slow because each write operation involves writing data to the disk.
-- Writes to the disk are done atomically meaning no data loss on a system-wide crash.
-- This crate utilizes the `BTreeMap` from `std::collections` for storing and accessing it's tables.
+> Please note that this database is highly optimized for read operations. Writing to the database is relatively slow because each write operation involves writing data to the disk when using `open`. These writes are done atomically, ensuring no data loss on a system-wide crash.
+
+- Data can be saved automatically and persistently to a formatted `json` file via `open`, or operated in-memory via `open_in_memory`.
 - Easy markup of tables using the `db!` macro.
 - Useful data accessing functions like `search` or `join!` macro to search the data or join data together.
-- Can save data to a specific path after each change automatically, atomically, and persistently via `open` or not via `open_in_memory`.
+- This crate utilizes the `BTreeMap` from `std::collections` for storing and accessing it's tables.
 - Supports accessing the database in parallel using a `Arc<AtomicDatabase<_>>`.
 
 ...and more. Look into [Todos](#todos) for more planned features!
