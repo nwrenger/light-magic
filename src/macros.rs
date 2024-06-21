@@ -28,7 +28,6 @@ macro_rules! db {
             }
         ),* $(,)?
     ) => {
-        use std::path::Path;
         use $crate::serde::{Serialize, Deserialize};
         use $crate::atomic::{DataStore, AtomicDatabase};
         use $crate::paste::paste;
