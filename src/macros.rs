@@ -13,10 +13,10 @@
 ///     // `{...}` is the table data
 ///     // the first field, like here `id`, is the `primary_key`
 ///     Table<User> => { id: usize, name: String, kind: String },
-///     // to not use the builtin table type use `None` as the identifier of the table
+///     // to not use the builtin table type use `Custom` as the identifier of the table
 ///     // using `:` after the table name you can add your own derives
 ///     // like here `PartialEq`
-///     None<Criminal: PartialEq> => { user_name: String, entry: String }
+///     Custom<Criminal: PartialEq> => { user_name: String, entry: String }
 /// }
 /// ```
 #[macro_export]
@@ -78,13 +78,13 @@ macro_rules! db {
             }
         }
     };
-    (@impls None, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {};
+    (@impls Custom, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {};
 
     // Helper for expanding the table type conditionally
     (@expand_table_ty Table, $first_type:ty, $table_name:ident) => {
         $crate::table::Table<$first_type, $table_name>
     };
-    (@expand_table_ty None, $first_type:ty, $table_name:ident) => {
+    (@expand_table_ty Custom, $first_type:ty, $table_name:ident) => {
         $table_name
     };
 

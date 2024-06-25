@@ -39,7 +39,7 @@ db! {
     Table<User> => { id: usize, name: String, kind: String },
     Table<Permission> => { user_name: String, level: Level },
     Table<Criminal> => { user_name: String, entry: String  },
-    None<Settings> => { time: usize, password: String }
+    Custom<Settings> => { time: usize, password: String }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
