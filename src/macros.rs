@@ -29,7 +29,7 @@ macro_rules! db {
         ),* $(,)?
     ) => {
         use $crate::serde::{Serialize, Deserialize};
-        use $crate::atomic::{DataStore, AtomicDatabase};
+        use $crate::atomic::DataStore;
         use $crate::paste::paste;
 
         paste! {
