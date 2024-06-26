@@ -28,8 +28,8 @@ where
 {
     /// Adds an entry to the table, returns the `value` or `None` if the addition failed
     pub fn add(&mut self, value: V) -> Option<V> {
-        let key = value.first_field().clone();
-        if !self.inner.contains_key(&key) {
+        let key = value.first_field();
+        if !self.inner.contains_key(key) {
             self.inner.insert(key.clone(), value.clone());
             return Some(value);
         }
@@ -37,17 +37,16 @@ where
     }
 
     /// Gets an entry from the table, returns the `value` or `None` if it couldn't find the data
-    pub fn get(&self, key: &K) -> Option<V> {
-        self.inner.get(key).cloned()
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.inner.get(key)
     }
 
     /// Edits an entry in the table, returns the `new_value` or `None` if the editing failed
     pub fn edit(&mut self, key: &K, new_value: V) -> Option<V> {
-        let new_key = new_value.first_field().clone();
-        if (key == &new_key || !self.inner.contains_key(&new_key))
-            && self.inner.remove(key).is_some()
+        let new_key = new_value.first_field();
+        if (key == new_key || !self.inner.contains_key(new_key)) && self.inner.remove(key).is_some()
         {
-            self.inner.insert(new_key, new_value.clone());
+            self.inner.insert(new_key.clone(), new_value.clone());
             return Some(new_value);
         }
         None
@@ -59,25 +58,25 @@ where
     }
 
     /// Searches the table by a `&str`, works in parallel
-    pub fn search(&self, search: &str) -> Vec<V> {
+    pub fn search(&self, search: &str) -> Vec<&V> {
         self.inner
             .values()
             .filter(|val| val.matches(search))
-            .cloned()
             .collect()
     }
 
+    /// Gets an iterator over the values of the map, in order by key.
     pub fn values(&self) -> Values<'_, K, V> {
         self.inner.values()
     }
 }
 
-/// Match trait, filled in `db` macro
+/// Match trait, filled in the `db!` macro
 pub trait Matches {
     fn matches(&self, search: &str) -> bool;
 }
 
-/// Trait for getting the value of the first field, filled in `db` macro
+/// Trait for getting the value of the first field, filled in the `db!` macro
 pub trait FirstField {
     type FieldType: Clone;
     fn first_field(&self) -> &Self::FieldType;
