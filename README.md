@@ -24,7 +24,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-light_magic = "0.5.3"
+light_magic = "0.5.4"
 ```
 
 ## Examples
