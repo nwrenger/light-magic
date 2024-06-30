@@ -13,7 +13,7 @@ use tracing::{error, info};
 /// Trait DataStore that requires a few implementations.
 /// The defined functions have default definitions.
 pub trait DataStore: Default + Serialize {
-    /// Opens a Database by the specified path. If the Database doesn't exist, this will create a new one! Wrap a Arc<_> around it to use it in parallel contexts!
+    /// Opens a Database by the specified path. If the Database doesn't exist, this will create a new one! Wrap a `Arc<_>` around it to use it in parallel contexts!
     fn open<P>(db: P) -> AtomicDatabase<Self>
     where
         P: AsRef<Path>,
