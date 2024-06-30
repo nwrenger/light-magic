@@ -141,10 +141,8 @@ fn custom_derives() {
     let inserted_user1 = db.write().user.add(user1.clone()).unwrap_or(user1);
     let inserted_user2 = db.write().user.add(user2.clone()).unwrap_or(user2);
 
-    // Ensure the inserted users are not the same (since their IDs should differ)
     assert_ne!(inserted_user1, inserted_user2);
 
-    // Ensure the inserted users have the expected properties
     assert_eq!(inserted_user1.name, "Nils");
     assert_eq!(inserted_user2.name, "Alice");
 }
