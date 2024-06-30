@@ -32,7 +32,7 @@ pub trait DataStore: Default + Serialize {
     where
         Self: DeserializeOwned,
     {
-        AtomicDatabase::load_in_memory().unwrap()
+        AtomicDatabase::load_in_memory()
     }
 
     /// Loads file data into the `Database`
@@ -62,12 +62,12 @@ pub struct AtomicDatabase<T: DataStore> {
 
 impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
     /// Load the database in memory.
-    pub fn load_in_memory() -> Result<Self, std::io::Error> {
-        Ok(Self {
+    pub fn load_in_memory() -> Self {
+        Self {
             path: None,
             tmp: None,
             data: RwLock::new(T::default()),
-        })
+        }
     }
 
     /// Load the database from the file system.
