@@ -30,15 +30,13 @@ macro_rules! db {
     ) => {
         use $crate::serde::{Serialize, Deserialize};
         use $crate::atomic::DataStore;
-        use $crate::paste::paste;
 
-        paste! {
+        $crate::paste::paste! {
             /// The Database Struct
             #[derive(Default, Debug, Serialize, Deserialize)]
             pub struct Database {
                 $(
-                        #[doc = "The " $table:camel " Table"]
-                        pub [<$table:snake>]: db!(@expand_table_ty $table_ty, db!(@get_first_type $($field_name : $field_ty),*), [<$table:camel>]),
+                        pub [<$table:snake>]: db!(@expand_table_ty $table_ty, db!(@get_first_type $($field_name : $field_ty),*), $table),
                 )*
             }
 
@@ -46,13 +44,13 @@ macro_rules! db {
 
             $(
                 #[derive(Default, Debug, Clone, Serialize, Deserialize, $( $( $derive),*)?)]
-                pub struct [<$table:camel>] {
+                pub struct $table {
                     $(
                         pub $field_name: $field_ty,
                     )*
                 }
 
-                db!(@impls $table_ty, [<$table:camel>], $($field_name : $field_ty),*);
+                db!(@impls $table_ty, $table, $($field_name : $field_ty),*);
             )*
         }
     };
