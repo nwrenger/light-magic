@@ -6,7 +6,37 @@ use std::str::FromStr;
 use std::{clone::Clone, collections::btree_map::Values};
 
 /// Represents a database table utilizing a `BTreeMap` for underlying data storage.
-/// Offers enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
+/// Needs the `PrimaryKey` trait to be implemented for the value type. Offers
+/// enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
+/// ```
+/// use light_magic::{
+///     atomic::DataStore,
+///     serde::{Deserialize, Serialize},
+///     table::{PrimaryKey, Table},
+/// };
+///
+/// #[derive(Default, Debug, Serialize, Deserialize)]
+/// struct Database {
+///     user: Table<User>,
+/// }
+///
+/// impl DataStore for Database {}
+///
+/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// struct User {
+///     id: usize,
+///     name: String,
+///     age: usize,
+/// }
+///
+/// impl PrimaryKey for User {
+///     type PrimaryKeyType = usize;
+///
+///     fn primary_key(&self) -> &Self::PrimaryKeyType {
+///         &self.id
+///     }
+/// }
+/// ```
 #[serde_as]
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Table<V>
