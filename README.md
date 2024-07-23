@@ -11,7 +11,7 @@ A lightweight, fast and easy-to-use implementation of a `persistent in-memory da
 Please note that this database is highly optimized for read operations. Writing to the database is relatively slow when using `open` because each write operation involves writing data to the disk. These writes are done atomically, ensuring no data loss on a system-wide crash.
 
 - **Persistent Data Storage**: Data can be saved automatically and persistently to a formatted `JSON` file via `open`, or it can be operated in-memory using `open_in_memory`.
-- **Easy Table Markup**: The `db!` macro allows for straightforward table markup.
+- **Easy Table Markup**: Utilizes Rusts beautiful type system.
 - **Powerful Data Access Functions**: Utilize functions like `search` and the `join!` macro for efficient data searching and joining.
 - **Efficient Storage**: The database employs a custom `Table` data type, which uses the `BTreeMap` type from `std::collections` under the hood, for efficient storage and easy access of its tables.
 - **Parallel Access Support**: Access the database in parallel using `Arc<AtomicDatabase<_>>`.
@@ -32,20 +32,76 @@ light_magic = "0.5.4"
 Using it in an `axum` Server? Look here: [maud-magic-rs](https://github.com/nwrenger/maud-magic-rs). Otherwise, look at this general example:
 
 ```rust
-use light_magic::{db, join};
+use light_magic::{
+    atomic::DataStore,
+    join,
+    serde::{Deserialize, Serialize},
+    table::{PrimaryKey, Table},
+};
 
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct Database {
+    user: Table<User>,
+    permission: Table<Permission>,
+    criminal: Table<Criminal>,
+    settings: Settings,
+}
 
-db! {
-    Table<User> => { id: usize, name: String, kind: String },
-    Table<Permission> => { user_name: String, level: Level },
-    Table<Criminal> => { user_name: String, entry: String  },
-    Custom<Settings> => { time: usize, password: String }
+impl DataStore for Database {}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct User {
+    id: usize,
+    name: String,
+    kind: String,
+}
+
+impl PrimaryKey for User {
+    type PrimaryKeyType = usize;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.id
+    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct Permission {
+    user_name: String,
+    level: Level,
+}
+
+impl PrimaryKey for Permission {
+    type PrimaryKeyType = String;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.user_name
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 enum Level {
     #[default]
     Admin,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct Criminal {
+    user_name: String,
+    entry: String,
+}
+
+impl PrimaryKey for Criminal {
+    type PrimaryKeyType = String;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.user_name
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct Settings {
+    time: usize,
+    password: String,
 }
 
 fn main() {
@@ -57,21 +113,21 @@ fn main() {
         kind: String::from("Young"),
     });
     println!("{:?}", db.read().user.get(&0));
-    println!("{:?}", db.read().user.search("0"));
+    println!("{:?}", db.read().user.search(|user| { user.name.contains("Nils") }));
 
     db.write().permission.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
     println!("{:?}", db.read().permission.get(&String::from("Nils")));
-    println!("{:?}", db.read().permission.search("Admin"));
+    println!("{:?}", db.read().permission.search(|permission| { permission.level == Level::Admin }));
 
     db.write().criminal.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
     println!("{:?}", db.read().criminal.get(&String::from("Nils")));
-    println!("{:?}", db.read().criminal.search("No records"));
+    println!("{:?}", db.read().criminal.search(|criminal| { criminal.entry.contains("No records") }));
 
     db.write().settings = Settings {
         time: 1718744090,

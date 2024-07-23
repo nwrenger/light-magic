@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::collections::BTreeMap;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use std::{clone::Clone, collections::btree_map::Values};
 
@@ -9,26 +9,27 @@ use std::{clone::Clone, collections::btree_map::Values};
 /// Offers enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
 #[serde_as]
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub struct Table<K, V>
+pub struct Table<V>
 where
-    K: Ord + FromStr + Display,
-    <K as FromStr>::Err: Display,
+    V: PrimaryKey,
     V: Serialize + for<'a> Deserialize<'a>,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug,
+    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: Display,
 {
     #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
     #[serde(flatten)]
-    inner: BTreeMap<K, V>,
+    inner: BTreeMap<<V as PrimaryKey>::PrimaryKeyType, V>,
 }
 
-impl<K, V> Table<K, V>
+impl<V> Table<V>
 where
-    K: Clone + Ord + FromStr + Display,
-    K::Err: Display,
-    V: Clone + Matches + FirstField<FieldType = K> + Serialize + for<'a> Deserialize<'a>,
+    V: Clone + PrimaryKey + Serialize + for<'a> Deserialize<'a>,
+    V::PrimaryKeyType: Clone + Ord + FromStr + Display + Debug,
+    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
     /// Adds an entry to the table, returns the `value` or `None` if the addition failed
     pub fn add(&mut self, value: V) -> Option<V> {
-        let key = value.first_field();
+        let key = value.primary_key();
         if !self.inner.contains_key(key) {
             self.inner.insert(key.clone(), value.clone());
             return Some(value);
@@ -37,13 +38,13 @@ where
     }
 
     /// Gets an entry from the table, returns the `value` or `None` if it couldn't find the data
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get(&self, key: &V::PrimaryKeyType) -> Option<&V> {
         self.inner.get(key)
     }
 
     /// Edits an entry in the table, returns the `new_value` or `None` if the editing failed
-    pub fn edit(&mut self, key: &K, new_value: V) -> Option<V> {
-        let new_key = new_value.first_field();
+    pub fn edit(&mut self, key: &V::PrimaryKeyType, new_value: V) -> Option<V> {
+        let new_key = new_value.primary_key();
         if (key == new_key || !self.inner.contains_key(new_key)) && self.inner.remove(key).is_some()
         {
             self.inner.insert(new_key.clone(), new_value.clone());
@@ -53,39 +54,34 @@ where
     }
 
     /// Deletes an entry from the table, returns the `value` or `None` if the deletion failed
-    pub fn delete(&mut self, key: &K) -> Option<V> {
+    pub fn delete(&mut self, key: &V::PrimaryKeyType) -> Option<V> {
         self.inner.remove(key)
     }
 
-    /// Searches the table by a `&str`, works in parallel
-    pub fn search(&self, search: &str) -> Vec<&V> {
-        self.inner
-            .values()
-            .filter(|val| val.matches(search))
-            .collect()
+    /// Searches the table by a predicate function
+    pub fn search<F>(&self, predicate: F) -> Vec<&V>
+    where
+        F: Fn(&V) -> bool,
+    {
+        self.inner.values().filter(|&val| predicate(val)).collect()
     }
 
     /// Gets an iterator over the values of the map, in order by key.
-    pub fn values(&self) -> Values<'_, K, V> {
+    pub fn values(&self) -> Values<'_, V::PrimaryKeyType, V> {
         self.inner.values()
     }
 }
 
-/// Match trait, filled in the `db!` macro
-pub trait Matches {
-    fn matches(&self, search: &str) -> bool;
-}
-
-/// Trait for getting the value of the first field, filled in the `db!` macro
-pub trait FirstField {
-    type FieldType: Clone;
-    fn first_field(&self) -> &Self::FieldType;
+/// Trait for getting the value of the primary key
+pub trait PrimaryKey {
+    type PrimaryKeyType;
+    fn primary_key(&self) -> &Self::PrimaryKeyType;
 }
 
 mod test {
     use serde::{Deserialize, Serialize};
 
-    use super::{FirstField, Matches};
+    use super::PrimaryKey;
 
     #[derive(Default, Debug, Clone, Serialize, Deserialize)]
     struct User {
@@ -94,16 +90,10 @@ mod test {
         age: usize,
     }
 
-    impl Matches for User {
-        fn matches(&self, _: &str) -> bool {
-            false
-        }
-    }
+    impl PrimaryKey for User {
+        type PrimaryKeyType = usize;
 
-    impl FirstField for User {
-        type FieldType = usize;
-
-        fn first_field(&self) -> &Self::FieldType {
+        fn primary_key(&self) -> &Self::PrimaryKeyType {
             &self.id
         }
     }
@@ -117,7 +107,6 @@ mod test {
         table.add(User::default());
 
         serde_json::to_string(&table).unwrap();
-        serde_json::from_str::<Table<usize, User>>(&"{\"0\":{\"id\":0,\"name\":\"\",\"age\":0}}")
-            .unwrap();
+        serde_json::from_str::<Table<User>>(&"{\"0\":{\"id\":0,\"name\":\"\",\"age\":0}}").unwrap();
     }
 }

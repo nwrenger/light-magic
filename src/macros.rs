@@ -1,116 +1,48 @@
-/// Creates the Database struct with the fitting logic. Use `open` for creating/opening one
-/// at a specified `path` or use `open_in_memory` to only use one in memory.
-///
-/// Lock the `AtomicDatabase` using `read()` / `write()` to access and change it values.
-/// The saving of changes will be applied after the used variables are dropped.
-///
-/// ```
-/// use light_magic::db;
-///
-/// db! {
-///     // `Table` is the identifier that this will use the builtin table type
-///     // `User` is the table name
-///     // `{...}` is the table data
-///     // the first field, like here `id`, is the `primary_key`
-///     Table<User> => { id: usize, name: String, kind: String },
-///     // to not use the builtin table type use `Custom` as the identifier of the table
-///     // using `:` after the table name you can add your own derives
-///     // like here `PartialEq`
-///     Custom<Criminal: PartialEq> => { user_name: String, entry: String }
-/// }
-/// ```
-#[macro_export]
-macro_rules! db {
-    (
-        $(
-            $table_ty:ident<$table:ty $( : $($derive:ident),* )?> => {
-                $($field_name:ident : $field_ty:ty),*
-            }
-        ),* $(,)?
-    ) => {
-        use $crate::serde::{Serialize, Deserialize};
-        use $crate::atomic::DataStore;
-
-        $crate::paste::paste! {
-            /// The Database Struct
-            #[derive(Default, Debug, Serialize, Deserialize)]
-            pub struct Database {
-                $(
-                        pub [<$table:snake>]: db!(@expand_table_ty $table_ty, db!(@get_first_type $($field_name : $field_ty),*), $table),
-                )*
-            }
-
-            impl<'a> DataStore for Database {}
-
-            $(
-                #[derive(Default, Debug, Clone, Serialize, Deserialize, $( $( $derive),*)?)]
-                pub struct $table {
-                    $(
-                        pub $field_name: $field_ty,
-                    )*
-                }
-
-                db!(@impls $table_ty, $table, $($field_name : $field_ty),*);
-            )*
-        }
-    };
-
-    // Creating impls for specific table types
-    (@impls Table, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {
-        impl $crate::table::Matches for $table_name {
-            fn matches(&self, query: &str) -> bool {
-                $(
-                    if format!("{:?}", self.$field_name).to_lowercase().contains(&query.to_lowercase()) {
-                        return true;
-                    }
-                )*
-                false
-            }
-        }
-
-        impl $crate::table::FirstField for $table_name {
-            type FieldType = db!(@get_first_type $($field_name : $field_ty),*);
-
-            fn first_field(&self) -> &Self::FieldType {
-                &db!(@get_first_name self, $($field_name),*)
-            }
-        }
-    };
-    (@impls Custom, $table_name:ident, $($field_name:ident : $field_ty:ty),*) => {};
-
-    // Helper for expanding the table type conditionally
-    (@expand_table_ty Table, $first_type:ty, $table_name:ident) => {
-        $crate::table::Table<$first_type, $table_name>
-    };
-    (@expand_table_ty Custom, $first_type:ty, $table_name:ident) => {
-        $table_name
-    };
-
-    // Helper for getting the first name of a struct
-    (@get_first_name $value:expr, $first_name:ident, $($rest_name:ident),*) => {
-        $value.$first_name
-    };
-    (@get_first_name $value:expr, $first_name:ident) => {
-        $value.$first_name
-    };
-
-    // Helper for getting the first type of a struct
-    (@get_first_type $first_name:ident : $first_ty:ty, $($rest_name:ident : $rest_ty:ty),*) => {
-        $first_ty
-    };
-    (@get_first_type $first_name:ident : $first_ty:ty) => {
-        $first_ty
-    };
-}
-
 /// Joins Data of different `Tables` in the Database together
 ///
 /// ```
-/// use light_magic::{db, join};
+/// use light_magic::{
+///     atomic::DataStore,
+///     join,
+///     serde::{Deserialize, Serialize},
+///     table::{PrimaryKey, Table},
+/// };
 ///
-/// db! {
-///     Table<User> => { id: usize, name: String, kind: String },
-///     Table<Criminal> => { user_name: String, entry: String }
+/// #[derive(Default, Debug, Serialize, Deserialize)]
+/// struct Database {
+///    user: Table<User>,
+///    criminal: Table<Criminal>,
+/// }
+///
+/// impl DataStore for Database {}
+///
+/// #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// struct User {
+///     id: usize,
+///     name: String,
+///     kind: String,
+/// }
+///
+/// impl PrimaryKey for User {
+///     type PrimaryKeyType = usize;
+///
+///     fn primary_key(&self) -> &Self::PrimaryKeyType {
+///         &self.id
+///     }
+/// }
+///
+/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// struct Criminal {
+///     user_name: String,
+///     entry: String,
+/// }
+///
+/// impl PrimaryKey for Criminal {
+///     type PrimaryKeyType = String;
+///
+///     fn primary_key(&self) -> &Self::PrimaryKeyType {
+///         &self.user_name
+///     }
 /// }
 ///
 /// let db = Database::open_in_memory();

@@ -1,16 +1,73 @@
-use light_magic::{db, join};
+use light_magic::{
+    atomic::DataStore,
+    join,
+    serde::{Deserialize, Serialize},
+    table::{PrimaryKey, Table},
+};
 
-db! {
-    Table<User: PartialEq> => { id: usize, name: String, kind: String },
-    Table<Permission> => { user_name: String, level: Level },
-    Table<Criminal> => { user_name: String, entry: String  },
-    Custom<Settings: PartialEq> => { time: usize, password: String }
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct Database {
+    user: Table<User>,
+    permission: Table<Permission>,
+    criminal: Table<Criminal>,
+    settings: Settings,
+}
+
+impl DataStore for Database {}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct User {
+    id: usize,
+    name: String,
+    kind: String,
+}
+
+impl PrimaryKey for User {
+    type PrimaryKeyType = usize;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.id
+    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct Permission {
+    user_name: String,
+    level: Level,
+}
+
+impl PrimaryKey for Permission {
+    type PrimaryKeyType = String;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.user_name
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 enum Level {
     #[default]
     Admin,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct Criminal {
+    user_name: String,
+    entry: String,
+}
+
+impl PrimaryKey for Criminal {
+    type PrimaryKeyType = String;
+
+    fn primary_key(&self) -> &Self::PrimaryKeyType {
+        &self.user_name
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct Settings {
+    time: usize,
+    password: String,
 }
 
 #[test]
@@ -24,21 +81,39 @@ fn normal_ops_in_persistence() {
         kind: String::from("Young"),
     });
     assert!(db.read().user.get(&0).is_some());
-    assert!(db.read().user.search("0").len() == 1);
+    assert!(
+        db.read()
+            .user
+            .search(|user| { user.name.contains("Nils") })
+            .len()
+            == 1
+    );
 
     db.write().permission.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
     assert!(db.read().permission.get(&String::from("Nils")).is_some());
-    assert!(db.read().permission.search("Admin").len() == 1);
+    assert!(
+        db.read()
+            .permission
+            .search(|permission| { permission.level == Level::Admin })
+            .len()
+            == 1
+    );
 
     db.write().criminal.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
     assert!(db.read().criminal.get(&String::from("Nils")).is_some());
-    assert!(db.read().criminal.search("No records").len() == 1);
+    assert!(
+        db.read()
+            .criminal
+            .search(|criminal| { criminal.entry.contains("No records") })
+            .len()
+            == 1
+    );
 
     let settings = Settings {
         time: 1718744090,
@@ -60,7 +135,13 @@ fn normal_ops_in_persistence() {
 
     assert!(db.read().criminal.get(&String::from("Nils")).is_none());
     assert!(db.read().criminal.get(&String::from("Nils W.")).is_some());
-    assert!(db.read().criminal.search("hot dog").len() == 1);
+    assert!(
+        db.read()
+            .criminal
+            .search(|criminal| { criminal.entry.contains("hot dog") })
+            .len()
+            == 1
+    );
 
     // deleting
     db.write().criminal.delete(&String::from("Nils W."));
@@ -79,21 +160,39 @@ fn normal_ops_in_memory() {
         kind: String::from("Young"),
     });
     assert!(db.read().user.get(&0).is_some());
-    assert!(db.read().user.search("0").len() == 1);
+    assert!(
+        db.read()
+            .user
+            .search(|user| { user.name.contains("Nils") })
+            .len()
+            == 1
+    );
 
     db.write().permission.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
     assert!(db.read().permission.get(&String::from("Nils")).is_some());
-    assert!(db.read().permission.search("Admin").len() == 1);
+    assert!(
+        db.read()
+            .permission
+            .search(|permission| { permission.level == Level::Admin })
+            .len()
+            == 1
+    );
 
     db.write().criminal.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
     assert!(db.read().criminal.get(&String::from("Nils")).is_some());
-    assert!(db.read().criminal.search("No records").len() == 1);
+    assert!(
+        db.read()
+            .criminal
+            .search(|criminal| { criminal.entry.contains("No records") })
+            .len()
+            == 1
+    );
 
     let settings = Settings {
         time: 1718744090,
@@ -115,7 +214,13 @@ fn normal_ops_in_memory() {
 
     assert!(db.read().criminal.get(&String::from("Nils")).is_none());
     assert!(db.read().criminal.get(&String::from("Nils W.")).is_some());
-    assert!(db.read().criminal.search("hot dog").len() == 1);
+    assert!(
+        db.read()
+            .criminal
+            .search(|criminal| { criminal.entry.contains("hot dog") })
+            .len()
+            == 1
+    );
 
     // deleting
     db.write().criminal.delete(&String::from("Nils W."));
