@@ -10,17 +10,9 @@ use std::{clone::Clone, collections::btree_map::Values};
 /// enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
 /// ```
 /// use light_magic::{
-///     atomic::DataStore,
 ///     serde::{Deserialize, Serialize},
 ///     table::{PrimaryKey, Table},
 /// };
-///
-/// #[derive(Default, Debug, Serialize, Deserialize)]
-/// struct Database {
-///     user: Table<User>,
-/// }
-///
-/// impl DataStore for Database {}
 ///
 /// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// struct User {
@@ -41,10 +33,9 @@ use std::{clone::Clone, collections::btree_map::Values};
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Table<V>
 where
-    V: PrimaryKey,
-    V: Serialize + for<'a> Deserialize<'a>,
+    V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
     V::PrimaryKeyType: Ord + FromStr + Display + Debug,
-    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: Display,
+    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
     #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
     #[serde(flatten)]
@@ -53,12 +44,16 @@ where
 
 impl<V> Table<V>
 where
-    V: Clone + PrimaryKey + Serialize + for<'a> Deserialize<'a>,
-    V::PrimaryKeyType: Clone + Ord + FromStr + Display + Debug,
+    V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug,
     <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
     /// Adds an entry to the table, returns the `value` or `None` if the addition failed
-    pub fn add(&mut self, value: V) -> Option<V> {
+    pub fn add(&mut self, value: V) -> Option<V>
+    where
+        V: Clone,
+        V::PrimaryKeyType: Clone,
+    {
         let key = value.primary_key();
         if !self.inner.contains_key(key) {
             self.inner.insert(key.clone(), value.clone());
@@ -73,7 +68,11 @@ where
     }
 
     /// Edits an entry in the table, returns the `new_value` or `None` if the editing failed
-    pub fn edit(&mut self, key: &V::PrimaryKeyType, new_value: V) -> Option<V> {
+    pub fn edit(&mut self, key: &V::PrimaryKeyType, new_value: V) -> Option<V>
+    where
+        V: Clone,
+        V::PrimaryKeyType: Clone,
+    {
         let new_key = new_value.primary_key();
         if (key == new_key || !self.inner.contains_key(new_key)) && self.inner.remove(key).is_some()
         {

@@ -7,9 +7,9 @@ use light_magic::{
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct Database {
-    user: Table<User>,
-    permission: Table<Permission>,
-    criminal: Table<Criminal>,
+    users: Table<User>,
+    permissions: Table<Permission>,
+    criminals: Table<Criminal>,
     settings: Settings,
 }
 
@@ -75,41 +75,41 @@ fn normal_ops_in_persistence() {
     let db = Database::open("./tests/test.json");
 
     // normal adding
-    db.write().user.add(User {
+    db.write().users.add(User {
         id: 0,
         name: String::from("Nils"),
         kind: String::from("Young"),
     });
-    assert!(db.read().user.get(&0).is_some());
+    assert!(db.read().users.get(&0).is_some());
     assert!(
         db.read()
-            .user
+            .users
             .search(|user| { user.name.contains("Nils") })
             .len()
             == 1
     );
 
-    db.write().permission.add(Permission {
+    db.write().permissions.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
-    assert!(db.read().permission.get(&String::from("Nils")).is_some());
+    assert!(db.read().permissions.get(&String::from("Nils")).is_some());
     assert!(
         db.read()
-            .permission
+            .permissions
             .search(|permission| { permission.level == Level::Admin })
             .len()
             == 1
     );
 
-    db.write().criminal.add(Criminal {
+    db.write().criminals.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
-    assert!(db.read().criminal.get(&String::from("Nils")).is_some());
+    assert!(db.read().criminals.get(&String::from("Nils")).is_some());
     assert!(
         db.read()
-            .criminal
+            .criminals
             .search(|criminal| { criminal.entry.contains("No records") })
             .len()
             == 1
@@ -125,7 +125,7 @@ fn normal_ops_in_persistence() {
     assert_eq!(db.read().settings, settings);
 
     // editing
-    db.write().criminal.edit(
+    db.write().criminals.edit(
         &String::from("Nils"),
         Criminal {
             user_name: String::from("Nils W."),
@@ -133,20 +133,20 @@ fn normal_ops_in_persistence() {
         },
     );
 
-    assert!(db.read().criminal.get(&String::from("Nils")).is_none());
-    assert!(db.read().criminal.get(&String::from("Nils W.")).is_some());
+    assert!(db.read().criminals.get(&String::from("Nils")).is_none());
+    assert!(db.read().criminals.get(&String::from("Nils W.")).is_some());
     assert!(
         db.read()
-            .criminal
+            .criminals
             .search(|criminal| { criminal.entry.contains("hot dog") })
             .len()
             == 1
     );
 
     // deleting
-    db.write().criminal.delete(&String::from("Nils W."));
+    db.write().criminals.delete(&String::from("Nils W."));
 
-    assert!(db.read().criminal.get(&String::from("Nils W.")).is_none());
+    assert!(db.read().criminals.get(&String::from("Nils W.")).is_none());
 }
 
 #[test]
@@ -154,41 +154,41 @@ fn normal_ops_in_memory() {
     let db = Database::open_in_memory();
 
     // normal adding
-    db.write().user.add(User {
+    db.write().users.add(User {
         id: 0,
         name: String::from("Nils"),
         kind: String::from("Young"),
     });
-    assert!(db.read().user.get(&0).is_some());
+    assert!(db.read().users.get(&0).is_some());
     assert!(
         db.read()
-            .user
+            .users
             .search(|user| { user.name.contains("Nils") })
             .len()
             == 1
     );
 
-    db.write().permission.add(Permission {
+    db.write().permissions.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
-    assert!(db.read().permission.get(&String::from("Nils")).is_some());
+    assert!(db.read().permissions.get(&String::from("Nils")).is_some());
     assert!(
         db.read()
-            .permission
+            .permissions
             .search(|permission| { permission.level == Level::Admin })
             .len()
             == 1
     );
 
-    db.write().criminal.add(Criminal {
+    db.write().criminals.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
-    assert!(db.read().criminal.get(&String::from("Nils")).is_some());
+    assert!(db.read().criminals.get(&String::from("Nils")).is_some());
     assert!(
         db.read()
-            .criminal
+            .criminals
             .search(|criminal| { criminal.entry.contains("No records") })
             .len()
             == 1
@@ -204,7 +204,7 @@ fn normal_ops_in_memory() {
     assert_eq!(db.read().settings, settings);
 
     // editing
-    db.write().criminal.edit(
+    db.write().criminals.edit(
         &String::from("Nils"),
         Criminal {
             user_name: String::from("Nils W."),
@@ -212,20 +212,20 @@ fn normal_ops_in_memory() {
         },
     );
 
-    assert!(db.read().criminal.get(&String::from("Nils")).is_none());
-    assert!(db.read().criminal.get(&String::from("Nils W.")).is_some());
+    assert!(db.read().criminals.get(&String::from("Nils")).is_none());
+    assert!(db.read().criminals.get(&String::from("Nils W.")).is_some());
     assert!(
         db.read()
-            .criminal
+            .criminals
             .search(|criminal| { criminal.entry.contains("hot dog") })
             .len()
             == 1
     );
 
     // deleting
-    db.write().criminal.delete(&String::from("Nils W."));
+    db.write().criminals.delete(&String::from("Nils W."));
 
-    assert!(db.read().criminal.get(&String::from("Nils W.")).is_none());
+    assert!(db.read().criminals.get(&String::from("Nils W.")).is_none());
 }
 
 #[test]
@@ -243,8 +243,8 @@ fn custom_derives() {
         kind: String::from("Old"),
     };
 
-    let inserted_user1 = db.write().user.add(user1.clone()).unwrap_or(user1);
-    let inserted_user2 = db.write().user.add(user2.clone()).unwrap_or(user2);
+    let inserted_user1 = db.write().users.add(user1.clone()).unwrap_or(user1);
+    let inserted_user2 = db.write().users.add(user2.clone()).unwrap_or(user2);
 
     assert_ne!(inserted_user1, inserted_user2);
 
@@ -257,56 +257,56 @@ fn joins() {
     let db = Database::open_in_memory();
 
     // remove any if there
-    db.write().permission.delete(&"Nils".to_string());
-    db.write().criminal.delete(&"Nils".to_string());
+    db.write().permissions.delete(&"Nils".to_string());
+    db.write().criminals.delete(&"Nils".to_string());
 
     // add smth
-    db.write().user.add(User {
+    db.write().users.add(User {
         id: 0,
         name: String::from("Nils"),
         kind: String::from("Young"),
     });
 
     let joined =
-        join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
+        join!(db.read(), "Nils", users => name, permissions => user_name, criminals => user_name);
     assert!(joined.is_empty());
 
     // add more
-    db.write().permission.add(Permission {
+    db.write().permissions.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
 
-    db.write().criminal.add(Criminal {
+    db.write().criminals.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
 
     let joined =
-        join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
+        join!(db.read(), "Nils", users => name, permissions => user_name, criminals => user_name);
     assert!(!joined.is_empty());
 
     // add even more
     for i in 0..4 {
-        db.write().user.add(User {
+        db.write().users.add(User {
             id: i,
             name: String::from("Smth".to_string() + &i.to_string()),
             kind: String::from("Young"),
         });
 
-        db.write().permission.add(Permission {
+        db.write().permissions.add(Permission {
             user_name: String::from("Smth".to_string() + &i.to_string()),
             level: Level::Admin,
         });
 
-        db.write().criminal.add(Criminal {
+        db.write().criminals.add(Criminal {
             user_name: String::from("Smth".to_string() + &i.to_string()),
             entry: String::from("No records until this day! Keep ur eyes pealed!"),
         });
     }
 
     let joined =
-        join!(db.read(), "Smth2", user => name, permission => user_name, criminal => user_name);
+        join!(db.read(), "Smth2", users => name, permissions => user_name, criminals => user_name);
 
     assert!(joined.len() == 1);
     assert!(joined[0].0.name == "Smth2");

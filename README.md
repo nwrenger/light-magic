@@ -41,9 +41,9 @@ use light_magic::{
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct Database {
-    user: Table<User>,
-    permission: Table<Permission>,
-    criminal: Table<Criminal>,
+    users: Table<User>,
+    permissions: Table<Permission>,
+    criminals: Table<Criminal>,
     settings: Settings,
 }
 
@@ -107,27 +107,27 @@ struct Settings {
 fn main() {
     let db = Database::open("./tests/test.json");
 
-     db.write().user.add(User {
+     db.write().users.add(User {
         id: 0,
         name: String::from("Nils"),
         kind: String::from("Young"),
     });
-    println!("{:?}", db.read().user.get(&0));
-    println!("{:?}", db.read().user.search(|user| { user.name.contains("Nils") }));
+    println!("{:?}", db.read().users.get(&0));
+    println!("{:?}", db.read().users.search(|user| { user.name.contains("Nils") }));
 
-    db.write().permission.add(Permission {
+    db.write().permissions.add(Permission {
         user_name: String::from("Nils"),
         level: Level::Admin,
     });
-    println!("{:?}", db.read().permission.get(&String::from("Nils")));
-    println!("{:?}", db.read().permission.search(|permission| { permission.level == Level::Admin }));
+    println!("{:?}", db.read().permissions.get(&String::from("Nils")));
+    println!("{:?}", db.read().permissions.search(|permission| { permission.level == Level::Admin }));
 
-    db.write().criminal.add(Criminal {
+    db.write().criminals.add(Criminal {
         user_name: String::from("Nils"),
         entry: String::from("No records until this day! Keep ur eyes pealed!"),
     });
-    println!("{:?}", db.read().criminal.get(&String::from("Nils")));
-    println!("{:?}", db.read().criminal.search(|criminal| { criminal.entry.contains("No records") }));
+    println!("{:?}", db.read().criminals.get(&String::from("Nils")));
+    println!("{:?}", db.read().criminals.search(|criminal| { criminal.entry.contains("No records") }));
 
     db.write().settings = Settings {
         time: 1718744090,
@@ -135,7 +135,7 @@ fn main() {
     };
     println!("{:?}", db.read().settings);
 
-    let joined = join!(db.read(), "Nils", user => name, permission => user_name, criminal => user_name);
+    let joined = join!(db.read(), "Nils", users => name, permissions => user_name, criminals => user_name);
     println!("{:?}", joined);
 }
 ```
