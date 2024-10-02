@@ -30,11 +30,11 @@ use std::{clone::Clone, collections::btree_map::Values};
 /// }
 /// ```
 #[serde_as]
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Table<V>
 where
     V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
     <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
     #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
@@ -45,7 +45,7 @@ where
 impl<V> Table<V>
 where
     V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
     <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
     /// Adds an entry to the table, returns the `value` or `None` if the addition failed
