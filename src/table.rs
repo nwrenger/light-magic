@@ -3,7 +3,10 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
-use std::{clone::Clone, collections::btree_map::Values};
+use std::{
+    clone::Clone,
+    collections::btree_map::{Values, ValuesMut},
+};
 
 /// Represents a database table utilizing a `BTreeMap` for underlying data storage.
 /// Needs the `PrimaryKey` trait to be implemented for the value type. Offers
@@ -67,6 +70,11 @@ where
         self.inner.get(key)
     }
 
+    /// Gets an mutable entry from the table, returns the `value` or `None` if it couldn't find the data
+    pub fn get_mut(&mut self, key: &V::PrimaryKeyType) -> Option<&mut V> {
+        self.inner.get_mut(key)
+    }
+
     /// Edits an entry in the table, returns the `new_value` or `None` if the editing failed
     pub fn edit(&mut self, key: &V::PrimaryKeyType, new_value: V) -> Option<V>
     where
@@ -98,6 +106,11 @@ where
     /// Gets an iterator over the values of the map, in order by key.
     pub fn values(&self) -> Values<'_, V::PrimaryKeyType, V> {
         self.inner.values()
+    }
+
+    /// Gets a mutable iterator over the values of the map, in order by key.
+    pub fn values_mut(&mut self) -> ValuesMut<'_, V::PrimaryKeyType, V> {
+        self.inner.values_mut()
     }
 }
 
