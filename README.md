@@ -4,7 +4,7 @@
 [![crates.io](https://img.shields.io/crates/d/light-magic.svg)](https://crates.io/crates/light-magic)
 [![docs.rs](https://docs.rs/light-magic/badge.svg)](https://docs.rs/light-magic)
 
-A lightweight, fast and easy-to-use implementation of a `persistent in-memory database`.
+A lightweight, fast and easy-to-use implementation of a optionally `encrypted/persistent in-memory database`.
 
 ## Features
 
