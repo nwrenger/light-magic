@@ -11,7 +11,7 @@ A lightweight, fast and easy-to-use implementation of a `persistent in-memory da
 Please note that this database is highly optimized for read operations. Writing to the database is relatively slow when using `open` because each write operation involves writing data to the disk. These writes are done atomically, ensuring no data loss on a system-wide crash.
 
 - **Persistent Data Storage**: Data can be saved automatically and persistently to a formatted `JSON` file via `open`, or it can be operated in-memory using `open_in_memory`.
-- **Encrypted Persistent Data Storage**: Data can be also saved encrypted via the `lockable` module using the same methods `open` and `open_in_memory`.
+- **Encrypted Persistent Data Storage**: Data can be also saved encrypted via the `encrypted` module using the same `open` method.
 - **Easy Table Markup**: Utilizes Rusts beautiful type system, structs and traits.
 - **Powerful Data Access Functions**: Utilize functions like `search` and the `join!` macro for efficient data searching and joining.
 - **Efficient Storage**: The database employs a custom `Table` data type, which uses the `BTreeMap` type from `std::collections` under the hood, for efficient storage and easy access of its tables.
