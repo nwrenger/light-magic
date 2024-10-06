@@ -13,7 +13,7 @@ Please note that this database is highly optimized for read operations. Writing 
 - **Persistent Data Storage**: Data can be saved automatically and persistently to a formatted `JSON` file via `open`, or it can be operated in-memory using `open_in_memory`.
 - **Encrypted Persistent Data Storage**: Data can be also saved encrypted via the `encrypted` module using the same `open` method.
 - **Easy Table Markup**: Utilizes Rusts beautiful type system, structs and traits.
-- **Powerful Data Access Functions**: Utilize functions like `search` and the `join!` macro for efficient data searching and joining.
+- **Powerful Data Access Functions**: Utilize functions like `search` / `search_ordered` and the `join!` macro for efficient data searching and joining.
 - **Efficient Storage**: The database employs a custom `Table` data type, which uses the `BTreeMap` type from `std::collections` under the hood, for efficient storage and easy access of its tables.
 - **Parallel Access Support**: Access the database in parallel using `Arc<AtomicDatabase<_>>`.
 
@@ -48,7 +48,9 @@ struct Database {
     settings: Settings,
 }
 
-impl DataStore for Database {}
+impl atomic::DataStore for Database {}
+// or
+// impl encrypted::EncryptedDataStore for Database {}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct User {
@@ -107,6 +109,8 @@ struct Settings {
 
 fn main() {
     let db = Database::open("./tests/test.json");
+    // or
+    // let db = Database::open("./tests/test.json", "somePassword");
 
      db.write().users.add(User {
         id: 0,

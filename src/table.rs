@@ -103,6 +103,17 @@ where
         self.inner.values().filter(|&val| predicate(val)).collect()
     }
 
+    /// Searches the table by a predicate function and a custom ordering with a comparator function
+    pub fn search_ordered<F, O>(&self, predicate: F, comparator: O) -> Vec<&V>
+    where
+        F: Fn(&V) -> bool,
+        O: Fn(&&V, &&V) -> std::cmp::Ordering,
+    {
+        let mut result = self.search(predicate);
+        result.sort_by(comparator);
+        result
+    }
+
     /// Gets an iterator over the values of the map, in order by key.
     pub fn values(&self) -> Values<'_, V::PrimaryKeyType, V> {
         self.inner.values()
