@@ -48,9 +48,9 @@ struct Database {
     settings: Settings,
 }
 
-impl atomic::DataStore for Database {}
+impl light_magic::atomic::DataStore for Database {}
 // or
-// impl encrypted::EncryptedDataStore for Database {}
+// impl light_magic::encrypted::EncryptedDataStore for Database {}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct User {

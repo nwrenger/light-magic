@@ -21,7 +21,7 @@ const NONCE_LEN: usize = 12;
 
 /// Structure to hold encrypted data along with salt and nonce
 #[derive(Serialize, Deserialize)]
-struct EncryptedData {
+pub struct EncryptedData {
     salt: Vec<u8>,
     nonce: Vec<u8>,
     ciphertext: Vec<u8>,
@@ -42,14 +42,36 @@ pub trait EncryptedDataStore: Default + Serialize {
         if db_path.exists() {
             EncryptedAtomicDatabase::load(db_path, password)
         } else {
-            EncryptedAtomicDatabase::create(db_path, password)
+            EncryptedAtomicDatabase::create_new(db_path, password)
+        }
+    }
+
+    // Load the database from a string with the provided password and save it to the filesystem.
+    // It checks if the provided password can decrypt the content successfully before saving it.
+    // Errors when a file already exists at the provided path.
+    fn create_from_str<P>(
+        data: &str,
+        path: P,
+        password: &str,
+    ) -> io::Result<EncryptedAtomicDatabase<Self>>
+    where
+        P: AsRef<Path>,
+        Self: DeserializeOwned,
+    {
+        let db_path = path.as_ref();
+        if !db_path.exists() {
+            EncryptedAtomicDatabase::create_from_str(data, path, password)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "A file already exists at the provided path!",
+            ))
         }
     }
 
     /// Loads file data into the `Database` after decrypting it.
     fn load_encrypted(file: impl Read, key: &Key<Aes256Gcm>) -> io::Result<Self>
     where
-        Self: Sized,
         Self: DeserializeOwned,
     {
         let encrypted: EncryptedData = serde_json::from_reader(file).map_err(|e| {
@@ -58,38 +80,35 @@ pub trait EncryptedDataStore: Default + Serialize {
                 format!("Failed to deserialize encrypted data: {}", e),
             )
         })?;
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(&encrypted.nonce);
-        let decrypted_bytes = cipher
-            .decrypt(nonce, encrypted.ciphertext.as_ref())
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Decryption failed: {}", e),
-                )
-            })?;
-        let data = serde_json::from_slice(&decrypted_bytes).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to deserialize decrypted data: {}", e),
-            )
-        })?;
-        Ok(data)
+
+        Self::decrypt(&encrypted, key)
     }
 
     /// Saves data of the `Database` to a file after encrypting it.
-    fn save_encrypted(&self, file: impl Write, key: &Key<Aes256Gcm>, salt: &[u8]) -> io::Result<()>
-    where
-        Self: Serialize,
-    {
-        // Generate nonce
+    fn save_encrypted(
+        &self,
+        file: impl Write,
+        key: &Key<Aes256Gcm>,
+        salt: &[u8],
+    ) -> io::Result<()> {
+        let encrypted = self.encrypt(key, salt)?;
+
+        serde_json::to_writer(file, &encrypted).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to write encrypted data to file: {}", e),
+            )
+        })
+    }
+
+    /// Encrypts the current data and returns the encrypted data (with salt, nonce, and ciphertext).
+    fn encrypt(&self, key: &Key<Aes256Gcm>, salt: &[u8]) -> io::Result<EncryptedData> {
         let mut nonce_bytes = vec![0u8; NONCE_LEN];
         OsRng.fill_bytes(&mut nonce_bytes);
 
         let cipher = Aes256Gcm::new(key);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        // Serialize data to JSON bytes
         let plaintext = serde_json::to_vec(self).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -97,25 +116,45 @@ pub trait EncryptedDataStore: Default + Serialize {
             )
         })?;
 
-        // Encrypt data
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).map_err(|e| {
             io::Error::new(io::ErrorKind::Other, format!("Encryption failed: {}", e))
         })?;
 
-        // Prepare EncryptedData
-        let encrypted = EncryptedData {
-            salt: salt.to_vec(), // Use existing salt
+        Ok(EncryptedData {
+            salt: salt.to_vec(),
             nonce: nonce_bytes,
             ciphertext,
-        };
-
-        // Serialize EncryptedData to JSON
-        serde_json::to_writer(file, &encrypted).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("Failed to write encrypted data to file: {}", e),
-            )
         })
+    }
+
+    /// Decrypts the encrypted data using the given key and returns the decrypted data.
+    fn decrypt(encrypted: &EncryptedData, key: &Key<Aes256Gcm>) -> io::Result<Self>
+    where
+        Self: DeserializeOwned,
+    {
+        let cipher = Aes256Gcm::new(key);
+        let nonce = Nonce::from_slice(&encrypted.nonce);
+
+        let decrypted_bytes = cipher
+            .decrypt(nonce, encrypted.ciphertext.as_ref())
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "Decryption failed: Incorrect password or corrupted data. {}",
+                        e
+                    ),
+                )
+            })?;
+
+        let data = serde_json::from_slice(&decrypted_bytes).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Failed to deserialize decrypted data: {}", e),
+            )
+        })?;
+
+        Ok(data)
     }
 }
 
@@ -167,8 +206,39 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         })
     }
 
+    /// Load the database from a string with the provided password and save it to the filesystem.
+    /// It checks if the provided password can decrypt the content successfully before saving it.
+    pub fn create_from_str<P: AsRef<Path>>(
+        data: &str,
+        path: P,
+        password: &str,
+    ) -> io::Result<Self> {
+        let new_path = path.as_ref().to_path_buf();
+        let tmp = Self::tmp_path(&new_path)?;
+
+        let encrypted: EncryptedData = serde_json::from_str(data).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Failed to deserialize encrypted data: {}", e),
+            )
+        })?;
+
+        let key = derive_key(password, &encrypted.salt)?;
+
+        let data = T::decrypt(&encrypted, &key)?;
+        atomic_write_encrypted(&tmp, &new_path, &data, &key, &encrypted.salt)?;
+
+        Ok(Self {
+            path: new_path,
+            tmp,
+            data: RwLock::new(data),
+            key: RwLock::new(key),
+            salt: RwLock::new(encrypted.salt),
+        })
+    }
+
     /// Create a new database and save it with the provided password.
-    pub fn create<P: AsRef<Path>>(path: P, password: &str) -> io::Result<Self> {
+    pub fn create_new<P: AsRef<Path>>(path: P, password: &str) -> io::Result<Self> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
 
