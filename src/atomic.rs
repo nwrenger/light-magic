@@ -1,3 +1,4 @@
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     ffi::{OsStr, OsString},
@@ -6,7 +7,6 @@ use std::{
     io::{self, BufWriter},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use tracing::{error, info};
 
@@ -105,7 +105,7 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
     /// Lock the database for reading.
     pub fn read(&self) -> AtomicDatabaseRead<'_, T> {
         AtomicDatabaseRead {
-            data: self.data.read().unwrap(),
+            data: self.data.read(),
         }
     }
 
@@ -114,7 +114,7 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
         AtomicDatabaseWrite {
             path: self.path.as_deref(),
             tmp: self.tmp.as_deref(),
-            data: self.data.write().unwrap(),
+            data: self.data.write(),
         }
     }
 
@@ -159,7 +159,7 @@ impl<T: DataStore> Drop for AtomicDatabase<T> {
         if let Some(tmp) = &self.tmp {
             if let Some(path) = &self.path {
                 info!("Saving database");
-                let guard = self.data.read().unwrap();
+                let guard = self.data.read();
                 atomic_write(tmp, path, &*guard).unwrap();
             }
         }

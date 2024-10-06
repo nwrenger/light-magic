@@ -3,6 +3,7 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use argon2::{self, Argon2};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rand::RngCore;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -12,7 +13,6 @@ use std::{
     io::{self, Read, Write},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use tracing::{error, info};
 
@@ -262,20 +262,20 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
     /// Lock the database for reading.
     pub fn read(&self) -> EncryptedAtomicDatabaseRead<'_, T> {
         EncryptedAtomicDatabaseRead {
-            data: self.data.read().unwrap(),
+            data: self.data.read(),
         }
     }
 
     /// Lock the database for writing. This will save the changes atomically on drop.
     pub fn write(&self) -> EncryptedAtomicDatabaseWrite<'_, T> {
         // Clone the current key and salt references
-        let key = *self.key.read().unwrap();
-        let salt = self.salt.read().unwrap().clone();
+        let key = *self.key.read();
+        let salt = self.salt.read().clone();
 
         EncryptedAtomicDatabaseWrite {
             path: self.path.as_ref(),
             tmp: self.tmp.as_ref(),
-            data: self.data.write().unwrap(),
+            data: self.data.write(),
             key,
             salt,
         }
@@ -283,7 +283,7 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
 
     /// Change the password of the database. This will re-encrypt the data with a new key derived from the new password.
     pub fn change_password(&self, new_password: &str) -> io::Result<()> {
-        let data_guard = self.data.read().unwrap();
+        let data_guard = self.data.read();
 
         let mut new_salt = vec![0u8; SALT_LEN];
         OsRng.fill_bytes(&mut new_salt);
@@ -293,11 +293,11 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         atomic_write_encrypted(&self.tmp, &self.path, &*data_guard, &new_key, &new_salt)?;
 
         {
-            let mut key_lock = self.key.write().unwrap();
+            let mut key_lock = self.key.write();
             *key_lock = new_key;
         }
         {
-            let mut salt_lock = self.salt.write().unwrap();
+            let mut salt_lock = self.salt.write();
             *salt_lock = new_salt;
         }
 
@@ -349,9 +349,9 @@ impl<T: EncryptedDataStore> fmt::Debug for EncryptedAtomicDatabase<T> {
 impl<T: EncryptedDataStore> Drop for EncryptedAtomicDatabase<T> {
     fn drop(&mut self) {
         info!("Saving database");
-        let data_guard = self.data.read().unwrap();
-        let key = self.key.read().unwrap();
-        let salt = self.salt.read().unwrap();
+        let data_guard = self.data.read();
+        let key = self.key.read();
+        let salt = self.salt.read();
         if let Err(e) = atomic_write_encrypted(&self.tmp, &self.path, &*data_guard, &key, &salt) {
             error!("Failed to save database: {}", e);
         }
