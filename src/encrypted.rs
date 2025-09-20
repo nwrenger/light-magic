@@ -1,11 +1,10 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
+    aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
 use argon2::{self, Argon2};
 use bincode::{self, Options};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use rand::RngCore;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     ffi::{OsStr, OsString},
