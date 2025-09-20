@@ -49,7 +49,7 @@ where
         } else {
             // Binary (e.g., bincode): emit as a sequence of V with known length
             let mut seq = serializer.serialize_seq(Some(self.inner.len()))?;
-            for (_, v) in &self.inner {
+            for v in self.inner.values() {
                 seq.serialize_element(v)?;
             }
             seq.end()
