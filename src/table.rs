@@ -136,6 +136,7 @@ mod test {
 
     use super::PrimaryKey;
 
+    #[allow(dead_code)]
     #[derive(Default, Debug, Clone, Serialize, Deserialize)]
     struct User {
         id: usize,

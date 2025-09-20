@@ -4,7 +4,7 @@
 [![crates.io](https://img.shields.io/crates/d/light-magic.svg)](https://crates.io/crates/light-magic)
 [![docs.rs](https://docs.rs/light-magic/badge.svg)](https://docs.rs/light-magic)
 
-A lightweight, fast and easy-to-use implementation of a optionally `encrypted/persistent in-memory database`.
+A lightweight, fast and easy-to-use implementation of a `persistent or optionally encrypted in-memory database`.
 
 ## Features
 
@@ -17,8 +17,6 @@ Please note that this database is highly optimized for read operations. Writing 
 - **Efficient Storage**: The database employs a custom `Table` data type, which uses the `BTreeMap` type from `std::collections` under the hood, for efficient storage and easy access of its tables.
 - **Parallel Access Support**: Access the database in parallel using `Arc<AtomicDatabase<_>>`.
 
-> ...and more. Look into [Todos](#todos) for more planned features!
-
 ## Installation
 
 Add this to your `Cargo.toml`:
@@ -27,6 +25,17 @@ Add this to your `Cargo.toml`:
 [dependencies]
 light_magic = "0.7.2"
 ```
+
+## Feature Flags
+
+`light-magic` is feature-flag driven. By default, only the `atomic` module is enabled.
+You can enable additional functionality in your `Cargo.toml`:
+
+- **`atomic`** _(default)_
+  Provides the basic atomic database with persistent JSON storage, type-safe tables, and the `DataStore` trait.
+
+- **`encrypted`**
+  Enables the `encrypted` module, which adds password-based Argon2id key derivation, AES-CTR encryption, and HMAC-SHA256 authentication on top of the atomic database.
 
 ## Examples
 
@@ -49,7 +58,7 @@ struct Database {
 }
 
 impl light_magic::atomic::DataStore for Database {}
-// or
+// or with features = ["encrypted"]
 // impl light_magic::encrypted::EncryptedDataStore for Database {}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -109,7 +118,7 @@ struct Settings {
 
 fn main() {
     let db = Database::open("./tests/test.json");
-    // or
+    // or with features = ["encrypted"]
     // let db = Database::open("./tests/test.json", "somePassword");
 
      db.write().users.add(User {
@@ -144,7 +153,3 @@ fn main() {
     println!("{:?}", joined);
 }
 ```
-
-## Todos
-
-> None currently

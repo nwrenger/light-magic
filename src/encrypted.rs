@@ -1,11 +1,12 @@
-use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
-};
-use argon2::{self, Argon2};
+use aes::Aes256;
+use argon2::{self, Argon2, Params};
+use ctr::cipher::{KeyIvInit, StreamCipher};
+use hmac::{Hmac, Mac};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use rand::RngCore;
+use rand::{rngs::OsRng, RngCore};
+use rmp_serde::{decode, encode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sha2::Sha256;
 use std::{
     ffi::{OsStr, OsString},
     fmt,
@@ -15,24 +16,27 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::{error, info};
+use zeroize::Zeroize;
+
+// Type definitions
+type Aes256Ctr = ctr::Ctr128BE<Aes256>;
+type HmacSha256 = Hmac<Sha256>;
 
 const SALT_LEN: usize = 16;
-const NONCE_LEN: usize = 12;
+const NONCE_LEN: usize = 16; // 128-bit nonce for AES-CTR
 
-/// Structure to hold encrypted data along with salt and nonce
+/// Structure to hold encrypted data along with salt, nonce, and HMAC
 #[derive(Serialize, Deserialize)]
 pub struct EncryptedData {
     salt: Vec<u8>,
     nonce: Vec<u8>,
     ciphertext: Vec<u8>,
+    hmac: Vec<u8>,
 }
 
 /// This trait needs to be implemented for the Database struct.
-/// It requires a few implementations. The defined functions
-/// have default implementations.
 pub trait EncryptedDataStore: Default + Serialize {
-    /// Opens a Database by the specified path and password. If the Database doesn't exist,
-    /// this will create a new one! Wrap a `Arc<_>` around it to use it in parallel contexts!
+    /// Opens a Database by the specified path and password.
     fn open<P>(db: P, password: &str) -> io::Result<EncryptedAtomicDatabase<Self>>
     where
         P: AsRef<Path>,
@@ -46,9 +50,7 @@ pub trait EncryptedDataStore: Default + Serialize {
         }
     }
 
-    // Load the database from a string with the provided password and save it to the filesystem.
-    // It checks if the provided password can decrypt the content successfully before saving it.
-    // Errors when a file already exists at the provided path.
+    /// Load the database from a string with the provided password and save it to the filesystem.
     fn create_from_str<P>(
         data: &str,
         path: P,
@@ -70,11 +72,11 @@ pub trait EncryptedDataStore: Default + Serialize {
     }
 
     /// Loads file data into the `Database` after decrypting it.
-    fn load_encrypted(file: impl Read, key: &Key<Aes256Gcm>) -> io::Result<Self>
+    fn load_encrypted(file: impl Read, key: &[u8]) -> io::Result<Self>
     where
         Self: DeserializeOwned,
     {
-        let encrypted: EncryptedData = serde_json::from_reader(file).map_err(|e| {
+        let encrypted: EncryptedData = decode::from_read(file).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Failed to deserialize encrypted data: {}", e),
@@ -85,15 +87,9 @@ pub trait EncryptedDataStore: Default + Serialize {
     }
 
     /// Saves data of the `Database` to a file after encrypting it.
-    fn save_encrypted(
-        &self,
-        file: impl Write,
-        key: &Key<Aes256Gcm>,
-        salt: &[u8],
-    ) -> io::Result<()> {
+    fn save_encrypted(&self, mut file: impl Write, key: &[u8], salt: &[u8]) -> io::Result<()> {
         let encrypted = self.encrypt(key, salt)?;
-
-        serde_json::to_writer(file, &encrypted).map_err(|e| {
+        encode::write(&mut file, &encrypted).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
                 format!("Failed to write encrypted data to file: {}", e),
@@ -101,53 +97,63 @@ pub trait EncryptedDataStore: Default + Serialize {
         })
     }
 
-    /// Encrypts the current data and returns the encrypted data (with salt, nonce, and ciphertext).
-    fn encrypt(&self, key: &Key<Aes256Gcm>, salt: &[u8]) -> io::Result<EncryptedData> {
+    /// Encrypts the current data and returns the encrypted data.
+    fn encrypt(&self, key: &[u8], salt: &[u8]) -> io::Result<EncryptedData> {
         let mut nonce_bytes = vec![0u8; NONCE_LEN];
         OsRng.fill_bytes(&mut nonce_bytes);
 
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(&nonce_bytes);
-
-        let plaintext = serde_json::to_vec(self).map_err(|e| {
+        let plaintext = encode::to_vec(self).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Serialization failed: {}", e),
             )
         })?;
 
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("Encryption failed: {}", e))
-        })?;
+        // Initialize cipher
+        let mut cipher = Aes256Ctr::new(key.into(), nonce_bytes.as_slice().into());
+
+        // Encrypt the plaintext in-place
+        let mut ciphertext = plaintext.clone();
+        cipher.apply_keystream(&mut ciphertext);
+
+        // Compute HMAC
+        let mut mac = HmacSha256::new_from_slice(key)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "HMAC initialization failed"))?;
+        mac.update(&ciphertext);
+        let hmac_bytes = mac.finalize().into_bytes().to_vec();
 
         Ok(EncryptedData {
             salt: salt.to_vec(),
             nonce: nonce_bytes,
             ciphertext,
+            hmac: hmac_bytes,
         })
     }
 
     /// Decrypts the encrypted data using the given key and returns the decrypted data.
-    fn decrypt(encrypted: &EncryptedData, key: &Key<Aes256Gcm>) -> io::Result<Self>
+    fn decrypt(encrypted: &EncryptedData, key: &[u8]) -> io::Result<Self>
     where
         Self: DeserializeOwned,
     {
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(&encrypted.nonce);
+        // Verify HMAC
+        let mut mac = HmacSha256::new_from_slice(key)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "HMAC initialization failed"))?;
+        mac.update(&encrypted.ciphertext);
+        mac.verify_slice(&encrypted.hmac).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "HMAC verification failed: Data is corrupted or tampered",
+            )
+        })?;
 
-        let decrypted_bytes = cipher
-            .decrypt(nonce, encrypted.ciphertext.as_ref())
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Decryption failed: Incorrect password or corrupted data. {}",
-                        e
-                    ),
-                )
-            })?;
+        // Initialize cipher
+        let mut cipher = Aes256Ctr::new(key.into(), encrypted.nonce.as_slice().into());
 
-        let data = serde_json::from_slice(&decrypted_bytes).map_err(|e| {
+        // Decrypt the ciphertext in-place
+        let mut decrypted_bytes = encrypted.ciphertext.clone();
+        cipher.apply_keystream(&mut decrypted_bytes);
+
+        let data = decode::from_slice(&decrypted_bytes).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Failed to deserialize decrypted data: {}", e),
@@ -159,39 +165,43 @@ pub trait EncryptedDataStore: Default + Serialize {
 }
 
 /// Derive a 32-byte key from the password and salt using Argon2id
-fn derive_key(password: &str, salt: &[u8]) -> io::Result<Key<Aes256Gcm>> {
-    let mut key = [0u8; 32]; // 256-bit key for AES-256
-    Argon2::default()
+fn derive_key(password: &str, salt: &[u8]) -> io::Result<[u8; 32]> {
+    let params = Params::new(65536, 3, 1, None)
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, "Invalid Argon2 parameters"))?;
+
+    let mut key = [0u8; 32];
+    Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params)
         .hash_password_into(password.as_bytes(), salt, &mut key)
         .map_err(|_| io::Error::new(io::ErrorKind::Other, "Key derivation failed"))?;
 
-    Ok(*Key::<Aes256Gcm>::from_slice(&key))
+    Ok(key)
 }
 
-/// Synchronized Wrapper, that automatically saves changes when path and tmp are defined
+/// Synchronized Wrapper that automatically saves changes when path and tmp are defined
 pub struct EncryptedAtomicDatabase<T: EncryptedDataStore> {
     path: PathBuf,
     tmp: PathBuf,
     data: RwLock<T>,
-    key: RwLock<Key<Aes256Gcm>>,
+    key: RwLock<[u8; 32]>,
     salt: RwLock<Vec<u8>>,
 }
 
 impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
-    /// Load the database from the file system with the provided password.
+    /// Load the database from the file system with the provided password
     pub fn load<P: AsRef<Path>>(path: P, password: &str) -> io::Result<Self> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
 
         let file = File::open(&new_path)?;
         // First, deserialize to get the salt
-        let encrypted: EncryptedData = serde_json::from_reader(&file).map_err(|e| {
+        let encrypted: EncryptedData = decode::from_read(&file).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Failed to deserialize encrypted data: {}", e),
             )
         })?;
         let key = derive_key(password, &encrypted.salt)?;
+
         // Re-open the file to reset the cursor
         let file = File::open(&new_path)?;
         let data = T::load_encrypted(file, &key)?;
@@ -216,7 +226,7 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
 
-        let encrypted: EncryptedData = serde_json::from_str(data).map_err(|e| {
+        let encrypted: EncryptedData = decode::from_slice(data.as_bytes()).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Failed to deserialize encrypted data: {}", e),
@@ -288,18 +298,22 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         let mut new_salt = vec![0u8; SALT_LEN];
         OsRng.fill_bytes(&mut new_salt);
 
-        let new_key = derive_key(new_password, &new_salt)?;
+        let mut new_key = derive_key(new_password, &new_salt)?;
 
         atomic_write_encrypted(&self.tmp, &self.path, &*data_guard, &new_key, &new_salt)?;
 
         {
             let mut key_lock = self.key.write();
-            *key_lock = new_key;
+            key_lock.copy_from_slice(&new_key);
         }
         {
             let mut salt_lock = self.salt.write();
-            *salt_lock = new_salt;
+            *salt_lock = new_salt.clone();
         }
+
+        // zeroize local ephemeral buffers
+        new_key.zeroize();
+        new_salt.fill(0);
 
         Ok(())
     }
@@ -327,7 +341,7 @@ fn atomic_write_encrypted<T: EncryptedDataStore>(
     tmp: &Path,
     path: &Path,
     data: &T,
-    key: &Key<Aes256Gcm>,
+    key: &[u8],
     salt: &[u8],
 ) -> io::Result<()> {
     {
@@ -350,8 +364,8 @@ impl<T: EncryptedDataStore> Drop for EncryptedAtomicDatabase<T> {
     fn drop(&mut self) {
         info!("Saving database");
         let data_guard = self.data.read();
-        let key = self.key.read();
-        let salt = self.salt.read();
+        let key = *self.key.read();
+        let salt = self.salt.read().clone();
         if let Err(e) = atomic_write_encrypted(&self.tmp, &self.path, &*data_guard, &key, &salt) {
             error!("Failed to save database: {}", e);
         }
@@ -373,7 +387,7 @@ pub struct EncryptedAtomicDatabaseWrite<'a, T: EncryptedDataStore> {
     tmp: &'a Path,
     path: &'a Path,
     data: RwLockWriteGuard<'a, T>,
-    key: Key<Aes256Gcm>,
+    key: [u8; 32],
     salt: Vec<u8>,
 }
 
