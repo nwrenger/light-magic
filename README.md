@@ -31,11 +31,8 @@ light_magic = "0.7.2"
 `light-magic` is feature-flag driven. By default, only the `atomic` module is enabled.
 You can enable additional functionality in your `Cargo.toml`:
 
-- **`atomic`** _(default)_
-  Provides the basic atomic database with persistent JSON storage, type-safe tables, and the `DataStore` trait.
-
-- **`encrypted`**
-  Enables the `encrypted` module, which adds password-based Argon2id key derivation, AES-CTR encryption, and HMAC-SHA256 authentication on top of the atomic database.
+- `atomic`: _Enabled by default_. Provides the basic atomic database with persistent JSON storage, type-safe tables, and the `DataStore` trait.
+- `encrypted`: Enables the `encrypted` module, which adds password-based Argon2id key derivation, AES-CTR encryption, and HMAC-SHA256 authentication on top of the atomic database.
 
 ## Examples
 
