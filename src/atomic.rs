@@ -4,7 +4,7 @@ use std::{
     ffi::{OsStr, OsString},
     fmt,
     fs::{self, File},
-    io::{self, BufWriter},
+    io::{self},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
@@ -45,10 +45,9 @@ pub trait DataStore: Default + Serialize {
         Ok(serde_json::from_reader(file)?)
     }
 
-    /// Saves data of the `Database` to a file
-    fn save(&self, file: impl io::Write) -> std::io::Result<()> {
-        let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self)?;
+    /// Saves data of the `Database` to a file (compact JSON for speed/size).
+    fn save(&self, mut file: impl io::Write) -> std::io::Result<()> {
+        serde_json::to_writer_pretty(&mut file, self)?;
         Ok(())
     }
 }
@@ -73,16 +72,14 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
 
     /// Load the database from the file system.
     pub fn load(path: &Path) -> Result<Self, std::io::Error> {
-        let new_path = path.with_extension("json");
-        let tmp = Self::tmp_path(&new_path)?;
-
+        let tmp = Self::tmp_path(path)?;
         let file = File::open(path)?;
         // for the future: make here version checks
         let data = T::load(file)?;
-        atomic_write(&tmp, &new_path, &data)?;
+        atomic_write(&tmp, path, &data)?;
 
         Ok(Self {
-            path: Some(new_path),
+            path: Some(path.into()),
             tmp: Some(tmp),
             data: RwLock::new(data),
         })
@@ -125,9 +122,14 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
         let tmp = path.with_file_name(tmp_name);
         if tmp.exists() {
             error!(
-            "Found orphaned database temporary file '{tmp:?}'. The server has recently crashed or is already running. Delete this before continuing!"
-        );
-            return Err(std::io::Error::last_os_error());
+                "Found orphaned database temporary file '{tmp:?}'. \
+                 The server has recently crashed or is already running. \
+                 Delete this before continuing!"
+            );
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "orphaned temporary file exists",
+            ));
         }
         Ok(tmp)
     }
@@ -135,7 +137,7 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
 
 /// Atomic write routine, loosely inspired by the tempfile crate.
 ///
-/// This assumes that the rename FS operations are atomic.
+/// This assumes that the rename FS operation is atomic.
 fn atomic_write<T: DataStore>(tmp: &Path, path: &Path, data: &T) -> Result<(), std::io::Error> {
     {
         let mut tmpfile = File::create(tmp)?;
@@ -156,11 +158,11 @@ impl<T: DataStore> fmt::Debug for AtomicDatabase<T> {
 
 impl<T: DataStore> Drop for AtomicDatabase<T> {
     fn drop(&mut self) {
-        if let Some(tmp) = &self.tmp {
-            if let Some(path) = &self.path {
-                info!("Saving database");
-                let guard = self.data.read();
-                atomic_write(tmp, path, &*guard).unwrap();
+        if let (Some(tmp), Some(path)) = (&self.tmp, &self.path) {
+            info!("Saving database");
+            let guard = self.data.read();
+            if let Err(e) = atomic_write(tmp, path, &*guard) {
+                error!("Failed to save database on drop: {}", e);
             }
         }
     }
@@ -198,10 +200,10 @@ impl<'a, T: DataStore> DerefMut for AtomicDatabaseWrite<'a, T> {
 
 impl<'a, T: DataStore> Drop for AtomicDatabaseWrite<'a, T> {
     fn drop(&mut self) {
-        if let Some(tmp) = self.tmp {
-            if let Some(path) = self.path {
-                info!("Saving database");
-                atomic_write(tmp, path, &*self.data).unwrap();
+        if let (Some(tmp), Some(path)) = (self.tmp, self.path) {
+            info!("Saving database");
+            if let Err(e) = atomic_write(tmp, path, &*self.data) {
+                error!("Failed to save database: {}", e);
             }
         }
     }

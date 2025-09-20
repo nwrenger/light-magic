@@ -222,6 +222,7 @@ fn file_corruption() {
         "Loading a corrupted file should have failed"
     );
     if let Err(e) = corrupted_result {
+        dbg!(e.to_string());
         assert_eq!(e.kind(), std::io::ErrorKind::InvalidData);
         assert!(
             e.to_string()

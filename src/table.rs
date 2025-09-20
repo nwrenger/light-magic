@@ -1,48 +1,140 @@
+use serde::de::{Error as DeError, MapAccess, SeqAccess, Visitor};
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::{
     clone::Clone,
     collections::btree_map::{Values, ValuesMut},
 };
 
+/// Trait for getting the value of the primary key
+pub trait PrimaryKey {
+    type PrimaryKeyType;
+    fn primary_key(&self) -> &Self::PrimaryKeyType;
+}
+
 /// Represents a database table utilizing a `BTreeMap` for underlying data storage.
-/// Needs the `PrimaryKey` trait to be implemented for the value type. Offers
-/// enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
-/// ```
-/// use light_magic::{
-///     serde::{Deserialize, Serialize},
-///     table::{PrimaryKey, Table},
-/// };
-///
-/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-/// struct User {
-///     id: usize,
-///     name: String,
-///     age: usize,
-/// }
-///
-/// impl PrimaryKey for User {
-///     type PrimaryKeyType = usize;
-///
-///     fn primary_key(&self) -> &Self::PrimaryKeyType {
-///         &self.id
-///     }
-/// }
-/// ```
-#[serde_as]
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+/// Human-readable serializers (e.g., JSON) see it as a map with string keys.
+/// Binary serializers (e.g., bincode) see it as a sequence of rows.
+#[derive(Default, Debug, Clone)]
 pub struct Table<V>
+where
+    V: PrimaryKey + Serialize,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
+    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+{
+    inner: BTreeMap<<V as PrimaryKey>::PrimaryKeyType, V>,
+}
+
+impl<V> Serialize for Table<V>
 where
     V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
     V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
     <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
-    #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
-    #[serde(flatten)]
-    inner: BTreeMap<<V as PrimaryKey>::PrimaryKeyType, V>,
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if serializer.is_human_readable() {
+            // Human-readable: emit as a map<String, V>
+            let mut map = serializer.serialize_map(Some(self.inner.len()))?;
+            for (k, v) in &self.inner {
+                map.serialize_entry(&k.to_string(), v)?;
+            }
+            map.end()
+        } else {
+            // Binary (e.g., bincode): emit as a sequence of V with known length
+            let mut seq = serializer.serialize_seq(Some(self.inner.len()))?;
+            for (_, v) in &self.inner {
+                seq.serialize_element(v)?;
+            }
+            seq.end()
+        }
+    }
+}
+
+impl<'de, V> Deserialize<'de> for Table<V>
+where
+    V: PrimaryKey + Serialize + Deserialize<'de>,
+    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
+    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            // Human-readable: expect a map<String, V>
+            struct MapVisitor<V>(PhantomData<V>);
+
+            impl<'de, V> Visitor<'de> for MapVisitor<V>
+            where
+                V: PrimaryKey + Serialize + Deserialize<'de>,
+                V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
+                <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+            {
+                type Value = Table<V>;
+
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.write_str("a map of stringified primary keys to rows")
+                }
+
+                fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: MapAccess<'de>,
+                {
+                    let mut inner = BTreeMap::new();
+                    while let Some((k_str, v)) = map.next_entry::<String, V>()? {
+                        let k = V::PrimaryKeyType::from_str(&k_str).map_err(|e| {
+                            A::Error::custom(format!(
+                                "failed to parse primary key '{}': {}",
+                                k_str, e
+                            ))
+                        })?;
+                        // Optional: sanity check that v.primary_key() matches k
+                        inner.insert(k, v);
+                    }
+                    Ok(Table { inner })
+                }
+            }
+
+            deserializer.deserialize_map(MapVisitor::<V>(PhantomData))
+        } else {
+            // Binary: expect a sequence of V; rebuild keys from PrimaryKey
+            struct SeqVisitor<V>(PhantomData<V>);
+
+            impl<'de, V> Visitor<'de> for SeqVisitor<V>
+            where
+                V: PrimaryKey + Serialize + Deserialize<'de>,
+                V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
+                <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+            {
+                type Value = Table<V>;
+
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.write_str("a sequence of table rows")
+                }
+
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
+                    let mut inner = BTreeMap::new();
+                    while let Some(v) = seq.next_element::<V>()? {
+                        let k = v.primary_key().clone();
+                        inner.insert(k, v);
+                    }
+                    Ok(Table { inner })
+                }
+            }
+
+            deserializer.deserialize_seq(SeqVisitor::<V>(PhantomData))
+        }
+    }
 }
 
 impl<V> Table<V>
@@ -70,7 +162,7 @@ where
         self.inner.get(key)
     }
 
-    /// Gets an mutable entry from the table, returns the `value` or `None` if it couldn't find the data
+    /// Gets a mutable entry from the table, returns the `value` or `None` if it couldn't find the data
     pub fn get_mut(&mut self, key: &V::PrimaryKeyType) -> Option<&mut V> {
         self.inner.get_mut(key)
     }
@@ -125,19 +217,12 @@ where
     }
 }
 
-/// Trait for getting the value of the primary key
-pub trait PrimaryKey {
-    type PrimaryKeyType;
-    fn primary_key(&self) -> &Self::PrimaryKeyType;
-}
-
+#[cfg(test)]
 mod test {
+    use super::{PrimaryKey, Table};
     use serde::{Deserialize, Serialize};
 
-    use super::PrimaryKey;
-
-    #[allow(dead_code)]
-    #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+    #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
     struct User {
         id: usize,
         name: String,
@@ -146,21 +231,41 @@ mod test {
 
     impl PrimaryKey for User {
         type PrimaryKeyType = usize;
-
         fn primary_key(&self) -> &Self::PrimaryKeyType {
             &self.id
         }
     }
 
     #[test]
-    fn serialize() {
-        use super::Table;
-
+    fn json_roundtrip_as_map() {
         let mut table = Table::default();
+        table.add(User {
+            id: 0,
+            name: "".into(),
+            age: 0,
+        });
+        let s = serde_json::to_string(&table).unwrap();
+        assert_eq!(s, r#"{"0":{"id":0,"name":"","age":0}}"#);
+        let back: Table<User> = serde_json::from_str(&s).unwrap();
+        assert!(back.get(&0).is_some());
+    }
 
-        table.add(User::default());
-
-        serde_json::to_string(&table).unwrap();
-        serde_json::from_str::<Table<User>>(&"{\"0\":{\"id\":0,\"name\":\"\",\"age\":0}}").unwrap();
+    #[test]
+    #[cfg(feature = "encrypted")]
+    fn bincode_roundtrip_as_seq() {
+        let mut table = Table::default();
+        for i in 0..3 {
+            table.add(User {
+                id: i,
+                name: format!("u{i}"),
+                age: i,
+            });
+        }
+        let bytes = bincode::serialize(&table).unwrap();
+        let back: Table<User> = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(table.values().count(), back.values().count());
+        for i in 0..3 {
+            assert_eq!(table.get(&i).unwrap().name, back.get(&i).unwrap().name);
+        }
     }
 }
