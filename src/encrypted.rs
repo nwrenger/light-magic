@@ -25,7 +25,7 @@ fn bincode_cfg() -> impl bincode::Options {
     bincode::DefaultOptions::new().with_fixint_encoding()
 }
 
-/// Encrypted envelope (serialized with bincode)
+/// Structure to hold encrypted data along with salt and nonce.
 #[derive(Serialize, Deserialize)]
 pub struct EncryptedData {
     salt: [u8; SALT_LEN],
@@ -33,8 +33,12 @@ pub struct EncryptedData {
     ciphertext: Vec<u8>,
 }
 
-/// Implement on your Database type.
+/// This trait needs to be implemented for the Database struct.
+/// It requires a few implementations. The defined functions
+/// have default implementations.
 pub trait EncryptedDataStore: Default + Serialize {
+    /// Opens a Database by the specified path and password. If the Database doesn't exist,
+    /// this will create a new one! Wrap a `Arc<_>` around it to use it in parallel contexts!
     fn open<P>(db: P, password: &str) -> io::Result<EncryptedAtomicDatabase<Self>>
     where
         P: AsRef<Path>,
@@ -48,6 +52,9 @@ pub trait EncryptedDataStore: Default + Serialize {
         }
     }
 
+    // Loads the database from a string with the provided password and save it to the filesystem.
+    // It checks if the provided password can decrypt the content successfully before saving it.
+    // Errors when a file already exists at the provided path.
     fn create_from_str<P>(
         data: &str,
         path: P,
@@ -68,7 +75,7 @@ pub trait EncryptedDataStore: Default + Serialize {
         }
     }
 
-    /// Loads after decrypting `EncryptedData` read from `file`.
+    /// Loads the database after decrypting it from file.
     fn load_encrypted(file: impl Read, key: &Key<Aes256Gcm>) -> io::Result<Self>
     where
         Self: DeserializeOwned,
@@ -82,7 +89,7 @@ pub trait EncryptedDataStore: Default + Serialize {
         Self::decrypt(&encrypted, key)
     }
 
-    /// Saves current state as encrypted `EncryptedData` to `file`.
+    /// Encrypts and safes the database to the file.
     fn save_encrypted(
         &self,
         mut file: impl Write,
@@ -100,7 +107,7 @@ pub trait EncryptedDataStore: Default + Serialize {
             })
     }
 
-    /// Encrypts the current data and returns the envelope.
+    /// Encrypts the current data and returns the encrypted data.
     fn encrypt(&self, key: &Key<Aes256Gcm>, salt: [u8; SALT_LEN]) -> io::Result<EncryptedData> {
         // Non-allocating nonce
         let mut nonce = [0u8; NONCE_LEN];
@@ -126,7 +133,7 @@ pub trait EncryptedDataStore: Default + Serialize {
         })
     }
 
-    /// Decrypts the envelope into data.
+    /// Decrypts the encrypted data using the given key and returns the decrypted data.
     fn decrypt(encrypted: &EncryptedData, key: &Key<Aes256Gcm>) -> io::Result<Self>
     where
         Self: DeserializeOwned,
@@ -155,7 +162,7 @@ pub trait EncryptedDataStore: Default + Serialize {
     }
 }
 
-/// Derive a 32-byte key from the password and salt using Argon2id
+/// Derive a 32-byte key from the password and salt using Argon2id.
 fn derive_key(password: &str, salt: &[u8]) -> io::Result<Key<Aes256Gcm>> {
     let mut key = [0u8; 32];
     Argon2::default()
@@ -177,12 +184,12 @@ pub struct EncryptedAtomicDatabase<T: EncryptedDataStore> {
 }
 
 impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
-    /// Load the database with the provided password.
+    /// Loads the database with the provided password.
     pub fn load<P: AsRef<Path>>(path: P, password: &str) -> io::Result<Self> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
 
-        // Read the whole envelope once; don't reopen
+        // Reads the whole envelope once; don't reopen
         let mut file = File::open(&new_path)?;
         let encrypted: EncryptedData = bincode_cfg().deserialize_from(&mut file).map_err(|e| {
             io::Error::new(
@@ -202,7 +209,8 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         })
     }
 
-    /// Load from an in-memory string and persist if successful.
+    /// Loads the database from a string with the provided password and save it to the filesystem.
+    /// It checks if the provided password can decrypt the content successfully before saving it.
     pub fn create_from_str<P: AsRef<Path>>(
         data: &str,
         path: P,
@@ -231,7 +239,7 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         })
     }
 
-    /// Create a new database and save it with the provided password.
+    /// Creates a new database and save it with the provided password.
     pub fn create_new<P: AsRef<Path>>(path: P, password: &str) -> io::Result<Self> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
@@ -253,14 +261,14 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         })
     }
 
-    /// Lock the database for reading.
+    /// Locks the database for reading.
     pub fn read(&self) -> EncryptedAtomicDatabaseRead<'_, T> {
         EncryptedAtomicDatabaseRead {
             data: self.data.read(),
         }
     }
 
-    /// Lock the database for writing. Saves changes atomically on drop.
+    /// Locks the database for writing. Saves changes atomically on drop.
     pub fn write(&self) -> EncryptedAtomicDatabaseWrite<'_, T> {
         let key = *self.key.read();
         let salt = *self.salt.read();
@@ -273,7 +281,7 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         }
     }
 
-    /// Change the password (re-encrypt with a new salt+key).
+    /// Changes the password of the database. This will re-encrypt the data with a new key derived from the new password.
     pub fn change_password(&self, new_password: &str) -> io::Result<()> {
         let data_guard = self.data.read();
 

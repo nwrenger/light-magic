@@ -36,7 +36,7 @@ pub trait DataStore: Default + Serialize {
         AtomicDatabase::load_in_memory()
     }
 
-    /// Loads file data into the `Database`
+    /// Loads file data into the `Database`.
     fn load(file: impl io::Read) -> std::io::Result<Self>
     where
         Self: Sized,
@@ -45,23 +45,23 @@ pub trait DataStore: Default + Serialize {
         Ok(serde_json::from_reader(file)?)
     }
 
-    /// Saves data of the `Database` to a file (compact JSON for speed/size).
+    /// Saves data of the `Database` to a JSON file.
     fn save(&self, mut file: impl io::Write) -> std::io::Result<()> {
         serde_json::to_writer_pretty(&mut file, self)?;
         Ok(())
     }
 }
 
-/// Synchronized Wrapper, that automatically saves changes when path and tmp are defined
+/// Synchronized Wrapper, that automatically saves changes when path and tmp are defined.
 pub struct AtomicDatabase<T: DataStore> {
     path: Option<PathBuf>,
-    /// Name of the DataStore temporary file
+    /// Name of the DataStore temporary file.
     tmp: Option<PathBuf>,
     data: RwLock<T>,
 }
 
 impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
-    /// Load the database in memory.
+    /// Loads the database in memory.
     pub fn load_in_memory() -> Self {
         Self {
             path: None,
@@ -70,7 +70,7 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
         }
     }
 
-    /// Load the database from the file system.
+    /// Loads the database from the file system.
     pub fn load(path: &Path) -> Result<Self, std::io::Error> {
         let tmp = Self::tmp_path(path)?;
         let file = File::open(path)?;
@@ -85,7 +85,7 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
         })
     }
 
-    /// Create a new database and save it.
+    /// Creates a new database and save it.
     pub fn create(path: &Path) -> Result<Self, std::io::Error> {
         let tmp = Self::tmp_path(path)?;
 
@@ -99,14 +99,14 @@ impl<T: DataStore + DeserializeOwned> AtomicDatabase<T> {
         })
     }
 
-    /// Lock the database for reading.
+    /// Locks the database for reading.
     pub fn read(&self) -> AtomicDatabaseRead<'_, T> {
         AtomicDatabaseRead {
             data: self.data.read(),
         }
     }
 
-    /// Lock the database for writing. This will save the changes atomically on drop.
+    /// Locks the database for writing. This will save the changes atomically on drop.
     pub fn write(&self) -> AtomicDatabaseWrite<'_, T> {
         AtomicDatabaseWrite {
             path: self.path.as_deref(),

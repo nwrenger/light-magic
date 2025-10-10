@@ -17,8 +17,29 @@ pub trait PrimaryKey {
 }
 
 /// Represents a database table utilizing a `BTreeMap` for underlying data storage.
-/// Human-readable serializers (e.g., JSON) see it as a map with string keys.
-/// Binary serializers (e.g., bincode) see it as a sequence of rows.
+/// Needs the `PrimaryKey` trait to be implemented for the value type. Offers
+/// enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
+/// ```
+/// use light_magic::{
+///     serde::{Deserialize, Serialize},
+///     table::{PrimaryKey, Table},
+/// };
+///
+/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// struct User {
+///     id: usize,
+///     name: String,
+///     age: usize,
+/// }
+///
+/// impl PrimaryKey for User {
+///     type PrimaryKeyType = usize;
+///
+///     fn primary_key(&self) -> &Self::PrimaryKeyType {
+///         &self.id
+///     }
+/// }
+/// ```
 #[derive(Default, Debug, Clone)]
 pub struct Table<V>
 where
@@ -143,7 +164,7 @@ where
     V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
     <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
 {
-    /// Adds an entry to the table, returns the `value` or `None` if the addition failed
+    /// Adds an entry to the table, returns the `value` or `None` if the `key` already exists in that table.
     pub fn add(&mut self, value: V) -> Option<V>
     where
         V: Clone,
@@ -157,17 +178,17 @@ where
         None
     }
 
-    /// Gets an entry from the table, returns the `value` or `None` if it couldn't find the data
+    /// Gets an entry from the table, returns the `value` or `None` if it couldn't find the `value`.
     pub fn get(&self, key: &V::PrimaryKeyType) -> Option<&V> {
         self.inner.get(key)
     }
 
-    /// Gets a mutable entry from the table, returns the `value` or `None` if it couldn't find the data
+    /// Gets a mutable entry from the table, returns the `value` or `None` if it couldn't find the `value`.
     pub fn get_mut(&mut self, key: &V::PrimaryKeyType) -> Option<&mut V> {
         self.inner.get_mut(key)
     }
 
-    /// Edits an entry in the table, returns the `new_value` or `None` if the editing failed
+    /// Edits an entry in the table, returns the `new_value` or `None` if the entry couldn't be found.
     pub fn edit(&mut self, key: &V::PrimaryKeyType, new_value: V) -> Option<V>
     where
         V: Clone,
@@ -182,12 +203,12 @@ where
         None
     }
 
-    /// Deletes an entry from the table, returns the `value` or `None` if the deletion failed
+    /// Deletes an entry from the table, returns the `value` or `None` if the `key` wasn't found.
     pub fn delete(&mut self, key: &V::PrimaryKeyType) -> Option<V> {
         self.inner.remove(key)
     }
 
-    /// Searches the table by a predicate function
+    /// Searches the table by a predicate function.
     pub fn search<F>(&self, predicate: F) -> Vec<&V>
     where
         F: Fn(&V) -> bool,
@@ -195,7 +216,7 @@ where
         self.inner.values().filter(|&val| predicate(val)).collect()
     }
 
-    /// Searches the table by a predicate function and a custom ordering with a comparator function
+    /// Searches the table by a predicate function and a custom ordering with a comparator function.
     pub fn search_ordered<F, O>(&self, predicate: F, comparator: O) -> Vec<&V>
     where
         F: Fn(&V) -> bool,

@@ -23,7 +23,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-light_magic = "0.8.0"
+light_magic = "0.8.1"
 ```
 
 ## Feature Flags
