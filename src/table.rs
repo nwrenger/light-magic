@@ -274,6 +274,8 @@ mod test {
     #[test]
     #[cfg(feature = "encrypted")]
     fn bincode_roundtrip_as_seq() {
+        use crate::encrypted::bincode_cfg;
+
         let mut table = Table::default();
         for i in 0..3 {
             table.add(User {
@@ -282,8 +284,9 @@ mod test {
                 age: i,
             });
         }
-        let bytes = bincode::serialize(&table).unwrap();
-        let back: Table<User> = bincode::deserialize(&bytes).unwrap();
+        let bytes = bincode::serde::encode_to_vec(&table, bincode_cfg()).unwrap();
+        let (back, _): (Table<User>, usize) =
+            bincode::serde::decode_from_slice(&bytes, bincode_cfg()).unwrap();
         assert_eq!(table.values().count(), back.values().count());
         for i in 0..3 {
             assert_eq!(table.get(&i).unwrap().name, back.get(&i).unwrap().name);

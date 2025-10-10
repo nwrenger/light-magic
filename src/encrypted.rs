@@ -3,7 +3,10 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use argon2::{self, Argon2};
-use bincode::{self, Options};
+use bincode::{
+    self,
+    serde::{decode_from_slice, decode_from_std_read, encode_into_std_write, encode_to_vec},
+};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -21,8 +24,8 @@ const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 
 #[inline]
-fn bincode_cfg() -> impl bincode::Options {
-    bincode::DefaultOptions::new().with_fixint_encoding()
+pub fn bincode_cfg() -> impl bincode::config::Config {
+    bincode::config::standard().with_fixed_int_encoding()
 }
 
 /// Structure to hold encrypted data along with salt and nonce.
@@ -76,14 +79,14 @@ pub trait EncryptedDataStore: Default + Serialize {
     }
 
     /// Loads the database after decrypting it from file.
-    fn load_encrypted(file: impl Read, key: &Key<Aes256Gcm>) -> io::Result<Self>
+    fn load_encrypted(file: &mut impl Read, key: &Key<Aes256Gcm>) -> io::Result<Self>
     where
         Self: DeserializeOwned,
     {
-        let encrypted: EncryptedData = bincode_cfg().deserialize_from(file).map_err(|e| {
+        let encrypted: EncryptedData = decode_from_std_read(file, bincode_cfg()).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Failed to deserialize encrypted data: {e}"),
+                format!("Failed to decode encrypted data: {e}"),
             )
         })?;
         Self::decrypt(&encrypted, key)
@@ -95,16 +98,14 @@ pub trait EncryptedDataStore: Default + Serialize {
         mut file: impl Write,
         key: &Key<Aes256Gcm>,
         salt: [u8; SALT_LEN],
-    ) -> io::Result<()> {
+    ) -> io::Result<usize> {
         let encrypted = self.encrypt(key, salt)?;
-        bincode_cfg()
-            .serialize_into(&mut file, &encrypted)
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Failed to write encrypted data to file: {e}"),
-                )
-            })
+        encode_into_std_write(encrypted, &mut file, bincode_cfg()).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to write encrypted data to file: {e}"),
+            )
+        })
     }
 
     /// Encrypts the current data and returns the encrypted data.
@@ -113,12 +114,9 @@ pub trait EncryptedDataStore: Default + Serialize {
         let mut nonce = [0u8; NONCE_LEN];
         OsRng.fill_bytes(&mut nonce);
 
-        // Serialize plaintext
-        let plaintext = bincode_cfg().serialize(self).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Serialization failed: {e}"),
-            )
+        // Encode plaintext
+        let plaintext = encode_to_vec(self, bincode_cfg()).map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidData, format!("Encoding failed: {e}"))
         })?;
 
         let cipher = Aes256Gcm::new(key);
@@ -151,10 +149,10 @@ pub trait EncryptedDataStore: Default + Serialize {
                 )
             })?;
 
-        let data = bincode_cfg().deserialize(&pt).map_err(|e| {
+        let (data, _) = decode_from_slice(&pt, bincode_cfg()).map_err(|e| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Failed to deserialize decrypted data: {e}"),
+                format!("Failed to decode decrypted data: {e}"),
             )
         })?;
 
@@ -191,12 +189,13 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
 
         // Reads the whole envelope once; don't reopen
         let mut file = File::open(&new_path)?;
-        let encrypted: EncryptedData = bincode_cfg().deserialize_from(&mut file).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to deserialize encrypted data: {e}"),
-            )
-        })?;
+        let encrypted: EncryptedData =
+            decode_from_std_read(&mut file, bincode_cfg()).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Failed to decode encrypted data: {e}"),
+                )
+            })?;
         let key = derive_key(password, &encrypted.salt)?;
         let data = T::decrypt(&encrypted, &key)?;
 
@@ -219,12 +218,13 @@ impl<T: EncryptedDataStore + DeserializeOwned> EncryptedAtomicDatabase<T> {
         let new_path = path.as_ref().to_path_buf();
         let tmp = Self::tmp_path(&new_path)?;
 
-        let encrypted: EncryptedData = bincode_cfg().deserialize(data.as_bytes()).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to deserialize encrypted data: {e}"),
-            )
-        })?;
+        let (encrypted, _): (EncryptedData, usize) =
+            decode_from_slice(data.as_bytes(), bincode_cfg()).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Failed to decode encrypted data: {e}"),
+                )
+            })?;
         let key = derive_key(password, &encrypted.salt)?;
         let data = T::decrypt(&encrypted, &key)?;
 
