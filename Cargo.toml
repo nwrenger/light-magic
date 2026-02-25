@@ -10,7 +10,7 @@ rust-version = "1.67.1"
 resolver = "2"
 repository = "https://github.com/nwrenger/light-magic"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [package.metadata.docs.rs]
 all-features = true
