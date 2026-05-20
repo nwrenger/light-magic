@@ -2,7 +2,7 @@ use serde::de::{Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::{
@@ -16,6 +16,23 @@ pub trait PrimaryKey {
     fn primary_key(&self) -> &Self::PrimaryKeyType;
 }
 
+/// Trait alias-like bound for primary key types supported by [`Table`].
+pub trait TableKey: Ord + FromStr + Display + Debug + Clone {
+    fn parse_key(value: &str) -> Result<Self, String>
+    where
+        Self: Sized;
+}
+
+impl<T> TableKey for T
+where
+    T: Ord + FromStr + Display + Debug + Clone,
+    T::Err: Display,
+{
+    fn parse_key(value: &str) -> Result<Self, String> {
+        T::from_str(value).map_err(|error| error.to_string())
+    }
+}
+
 /// Represents a database table utilizing a `BTreeMap` for underlying data storage.
 /// Needs the `PrimaryKey` trait to be implemented for the value type. Offers
 /// enhanced methods for manipulating records, including `add`, `edit`, `delete`, `get`, and `search`.
@@ -25,7 +42,7 @@ pub trait PrimaryKey {
 ///     table::{PrimaryKey, Table},
 /// };
 ///
-/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// struct User {
 ///     id: usize,
 ///     name: String,
@@ -40,21 +57,50 @@ pub trait PrimaryKey {
 ///     }
 /// }
 /// ```
-#[derive(Default, Debug, Clone)]
 pub struct Table<V>
 where
-    V: PrimaryKey + Serialize,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+    V: PrimaryKey,
 {
     inner: BTreeMap<<V as PrimaryKey>::PrimaryKeyType, V>,
+}
+
+impl<V> Debug for Table<V>
+where
+    V: PrimaryKey + Debug,
+    V::PrimaryKeyType: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Table").field("inner", &self.inner).finish()
+    }
+}
+
+impl<V> Clone for Table<V>
+where
+    V: PrimaryKey + Clone,
+    V::PrimaryKeyType: Clone,
+{
+    fn clone(&self) -> Self {
+        Table {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<V> Default for Table<V>
+where
+    V: PrimaryKey,
+{
+    fn default() -> Self {
+        Table {
+            inner: BTreeMap::new(),
+        }
+    }
 }
 
 impl<V> Serialize for Table<V>
 where
     V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+    V::PrimaryKeyType: TableKey,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -81,8 +127,7 @@ where
 impl<'de, V> Deserialize<'de> for Table<V>
 where
     V: PrimaryKey + Serialize + Deserialize<'de>,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+    V::PrimaryKeyType: TableKey,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -95,8 +140,7 @@ where
             impl<'de, V> Visitor<'de> for MapVisitor<V>
             where
                 V: PrimaryKey + Serialize + Deserialize<'de>,
-                V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-                <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+                V::PrimaryKeyType: TableKey,
             {
                 type Value = Table<V>;
 
@@ -110,7 +154,7 @@ where
                 {
                     let mut inner = BTreeMap::new();
                     while let Some((k_str, v)) = map.next_entry::<String, V>()? {
-                        let k = V::PrimaryKeyType::from_str(&k_str).map_err(|e| {
+                        let k = V::PrimaryKeyType::parse_key(&k_str).map_err(|e| {
                             A::Error::custom(format!(
                                 "failed to parse primary key '{}': {}",
                                 k_str, e
@@ -131,8 +175,7 @@ where
             impl<'de, V> Visitor<'de> for SeqVisitor<V>
             where
                 V: PrimaryKey + Serialize + Deserialize<'de>,
-                V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-                <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+                V::PrimaryKeyType: TableKey,
             {
                 type Value = Table<V>;
 
@@ -161,8 +204,7 @@ where
 impl<V> Table<V>
 where
     V: PrimaryKey + Serialize + for<'a> Deserialize<'a>,
-    V::PrimaryKeyType: Ord + FromStr + Display + Debug + Clone,
-    <<V as PrimaryKey>::PrimaryKeyType as FromStr>::Err: std::fmt::Display,
+    V::PrimaryKeyType: TableKey,
 {
     /// Adds an entry to the table, returns the `value` or `None` if the `key` already exists in that table.
     pub fn add(&mut self, value: V) -> Option<V>
@@ -243,7 +285,7 @@ mod test {
     use super::{PrimaryKey, Table};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[derive(Clone, Debug, Serialize, Deserialize)]
     struct User {
         id: usize,
         name: String,

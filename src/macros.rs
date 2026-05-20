@@ -16,7 +16,7 @@
 ///
 /// impl DataStore for Database {}
 ///
-/// #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// struct User {
 ///     id: usize,
 ///     name: String,
@@ -31,7 +31,7 @@
 ///     }
 /// }
 ///
-/// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// struct Criminal {
 ///     user_name: String,
 ///     entry: String,

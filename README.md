@@ -23,7 +23,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-light_magic = "0.8.2"
+light_magic = "0.8.4"
 ```
 
 ## Feature Flags
@@ -58,7 +58,7 @@ impl light_magic::atomic::DataStore for Database {}
 // or with features = ["encrypted"]
 // impl light_magic::encrypted::EncryptedDataStore for Database {}
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 struct User {
     id: usize,
     name: String,
@@ -73,7 +73,7 @@ impl PrimaryKey for User {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Permission {
     user_name: String,
     level: Level,
@@ -87,13 +87,12 @@ impl PrimaryKey for Permission {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 enum Level {
-    #[default]
     Admin,
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Criminal {
     user_name: String,
     entry: String,
@@ -107,7 +106,7 @@ impl PrimaryKey for Criminal {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
 struct Settings {
     time: usize,
     password: String,

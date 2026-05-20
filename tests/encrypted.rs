@@ -222,12 +222,12 @@ fn file_corruption() {
         "Loading a corrupted file should have failed"
     );
     if let Err(e) = corrupted_result {
-        dbg!(e.to_string());
+        let error_message = e.to_string();
         assert_eq!(e.kind(), std::io::ErrorKind::InvalidData);
         assert!(
-            e.to_string()
-                .contains("Failed to deserialize encrypted data")
-                || e.to_string().contains("Decryption failed"),
+            error_message.contains("Failed to decode encrypted data")
+                || error_message.contains("Failed to decode decrypted data")
+                || error_message.contains("Decryption failed"),
             "Error message does not indicate corruption"
         );
     }
